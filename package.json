@@ -1,0 +1,16 @@
+{
+  "name": "chengxinjian-contracts",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Documentation and API contracts only; not the application implementation",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "schema": "node -e \"require('fs').mkdirSync('research',{recursive:true})\" && typescript-json-schema tsconfig.json Api --required --noExtraProps --out research/api-schema.json",
+    "docs": "python scripts/build_docs.py",
+    "check": "npm run typecheck && npm run schema && npm run docs"
+  },
+  "devDependencies": {
+    "typescript": "5.9.3",
+    "typescript-json-schema": "0.65.1"
+  }
+}
