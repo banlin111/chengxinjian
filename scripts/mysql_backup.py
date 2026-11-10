@@ -15,7 +15,9 @@ import tempfile
 def run():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('action', choices=['backup', 'restore-drill'])
-    parser.add_argument('--client-config', required=True, type=Path)
+    access = parser.add_mutually_exclusive_group(required=True)
+    access.add_argument('--client-config', type=Path)
+    access.add_argument('--docker-container', help='MySQL service container from the isolated Compose stack')
     parser.add_argument('--bin-dir', type=Path)
     parser.add_argument('--database', required=True)
     parser.add_argument('--archive', required=True, type=Path)
@@ -24,14 +26,20 @@ def run():
     schema = args.database
     if not re.fullmatch(r'[A-Za-z][A-Za-z0-9_]{0,60}', schema):
         parser.error('Invalid schema name')
-    info = args.client_config.lstat()
-    if not stat.S_ISREG(info.st_mode) or info.st_uid != os.getuid() or info.st_mode & 0o077:
-        parser.error('Client configuration must be a private file owned by the operator')
-    config = '--defaults-file=' + str(args.client_config.resolve())
+    if args.client_config:
+        info = args.client_config.lstat()
+        if not stat.S_ISREG(info.st_mode) or info.st_uid != os.getuid() or info.st_mode & 0o077:
+            parser.error('Client configuration must be a private file owned by the operator')
+    elif args.bin_dir or not re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9_.-]*', args.docker_container):
+        parser.error('Invalid container target')
 
     def command(name, *options):
+        if args.docker_container:
+            return ['docker', 'exec', '-i', args.docker_container, 'sh', '-ec',
+                    'export MYSQL_PWD="${MYSQL_ROOT_PASSWORD:?}"; exec "$@"', 'cxj-mysql',
+                    name, '--user=root', *options]
         executable = str(args.bin_dir / name) if args.bin_dir else name
-        return [executable, config, *options]
+        return [executable, '--defaults-file=' + str(args.client_config.resolve()), *options]
 
     def digest(file):
         hasher = hashlib.sha256()

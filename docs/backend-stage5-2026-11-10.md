@@ -42,16 +42,23 @@
 | 自动测试 | JDK 21、H2 和原生 MySQL 8.4.11 隔离库分别通过 91 项，无跳过。覆盖目录、父项引用、审核撤回、讲师越权、幂等重放、版本冲突、过期和并存权益、按来源撤权、试听限制、续签、事件去重、恢复进度及处理任务重试。自动用例中的存储替身只用于权限和错误路径。 |
 | 真实开发联调 | 打包 Java、本机 cxj_test、微信 IDE、真实 code2Session、腾讯 STS、上海私有 COS、FFmpeg。78 个检查通过。合成图片完成审核、重新绘制、头像引用和撤回；4 秒合成视频裁切，另行完整解码其 1 秒衍生文件。相同微信账号先试听、获人工单课权益后下载完整文件、撤销后恢复试听。IDE 发起签名下载、上报 seek 和续签。临时登录退出、人工权益撤销、测试内容归档，云对象含试听副本删除后逐个 HEAD 核对 404。 |
 | 本地升级与恢复 | cxj_dev 升级前生成 0600 备份，在全新隔离 schema 恢复并逐表核对 23 张表行数及 Flyway 版本，然后删除演练 schema。开发库实际迁移至 V7，18080 readiness=UP，课程及套餐路由返回 OK。 |
-| 公网、正式前端、真机、上线 | 此轮均待验收。开发工具使用本地端口，下载通过不代表真实设备播放、长时续播、商业课程容量、真机后台音频、退款或支付已验收。 |
+| 上海隔离实例 | 实际构建并运行 Docker 镜像，MySQL 8.4.11 和应用通过 Compose 启动。非 local 的 mysql、prod profiles 完成七份迁移，云端 SSH 隧道 HTTP 实测和数据库恢复结果见下节。 |
+| 公网 HTTPS、正式前端、真机、上线 | 此轮均待验收。开发工具使用本地端口，下载通过不代表真实设备播放、长时续播、商业课程容量、真机后台音频、退款或支付已验收。 |
 
 本机证据在被 Git 忽略的 `server/target/` 中，包括 `stage5-h2.log`、`stage5-mysql.log`、`stage5-loader.log`、`stage5-contract.log`、`stage5-openapi.log`、`course-cos-smoke/result.json`、`stage5-restore.json`。真实供应商复测仅在独占本机可清理的 cxj_test、18082 和 IDE 自动化端口时执行。已配置的 stdio 解释器和包装器路径分别通过 `WECHAT_MCP_PYTHON`、`WECHAT_MCP_WRAPPER` 传入，再执行 `../.tools/cos-runtime/bin/python scripts/smoke_media_cos.py --run-real-cloud-upload --course-probe`。独立探针不持久化任何业务凭据。GitHub Actions 不持有微信或 COS 密钥。
 
 ## 公网部署准备
 
-2026-11-10 只读查看当前登录的腾讯云控制台，总览显示 CVM 和轻量运行中均为 0 台，可用余额为 0 元。用户确认由甲方后续充值，到账后开发方创建隔离实例。现有开发 COS 的 HeadBucket 成功，GetBucketCORS 返回 NoSuchCORSConfiguration。Web 管理后台直传需在正式测试源确定后按源配置并实际验证 CORS。
+2026-11-10 已根据用户授权在上海创建一台独立的 Ubuntu 24.04 LTS 轻量应用服务器。完成 SSH 密钥登录，核对 2 核、8 GB 套餐、120 GB 系统盘。域名暂未准备，当前实例用于隔离联调。实例标识、公网地址、密钥、购买凭证和数据库备份不随仓库分发。
+
+在该机安装 Docker 29.1.3 和 Compose 2.40.3，使用腾讯云内网镜像加速源拉取 MySQL 和 Temurin。在服务器构建应用镜像，并确认容器 FFmpeg 8.0.1 可执行。应用代码对应协作分支提交 `2274752`，该提交的 [GitHub Actions](https://github.com/banlin111/chengxinjian/actions/runs/42788943206) 中 contracts、backend 两个 job 成功。镜像与 Compose 由这台真实服务器验证；CI 沿用仓库原有工作流。
+
+云上实例运行空白联调库，数据库端口不映射到主机，API 仅映射到 127.0.0.1:18080，SSH 通过项目专用公钥认证。云端未配置本地验证码、开发管理员、测试协议或可公开的图片投放域名，也未向新机复制本机微信及开发桶密钥。经加密隧道检查 readiness 为 UP、课程和套餐为 200/OK、匿名后台和用户资料为 401、隐私协议为 503/AGREEMENTS_UNAVAILABLE。镜像中的系统时间为 UTC，未植入测试内容。云机上直接对容器 MySQL 作私有备份，使用 SHA-256 校验并恢复到独立新库，35 张表全部 CHECKSUM 匹配、V1–V7 均成功，随后移除演练库；另在本机私有目录保存并校验了备份副本。证据为被忽略的 `stage5-staging-http.json` 和 `stage5-staging-restore.json`。这次演练覆盖该时点的隔离数据库，不覆盖云对象或持续增量恢复。
+
+现有开发桶 HeadBucket 成功，GetBucketCORS 返回 NoSuchCORSConfiguration。Web 管理后台直传需在测试源确定后按源配置并实际验证 CORS。前端使用公网地址前仍需项目域名、备案、DNS、HTTPS、微信合法域名，以及相应环境的协议与管理认证。
 
 - 在确定的主机或 CI 构建处执行 `./scripts/backend.sh test`，用 `docker build -t cxj-api:<已验证提交> server` 生成镜像，保留对应 Git SHA 和镜像 ID。`server/.dockerignore` 限制构建上下文，只纳入打包 JAR 和 Dockerfile。
 - 运行 `scripts/staging_release.sh /部署机上的私有环境文件 cxj-api:<已验证提交>`。Compose 叠加 `infra/compose.staging.yml`，只启动 MySQL 与应用。数据库仅在容器内部网络可达，API 监听主机回环，入口反代负责 TLS。应用使用 mysql、prod profiles；FFmpeg、非 root 用户、只读根文件系统和临时文件空间在镜像/运行配置中。运行脚本会检查 readiness 和课程接口。
-- 部署环境文件包含 `DB_PASSWORD`、`MYSQL_ROOT_PASSWORD`、基础 Compose 解析所需的 `REDIS_PASSWORD`、`MEDIA_PUBLIC_ORIGIN` 和精确的 `ADMIN_ALLOWED_ORIGINS`。按需安全注入该环境的微信与 COS 配置。环境文件由部署账号持有，权限 0600，使用 Docker Compose 环境文件的引号规则。测试域名、备案、HTTPS、微信合法域名、正式协议、管理员初始化、人机验证、监控和备份仍需实际接入。
-- 迁移前在限制访问的目录执行 `python3 scripts/mysql_backup.py backup --client-config /私有/mysql.cnf --database chengxinjian --archive /私有备份/本次.sql.gz`。保存输出 SHA-256。恢复演练使用 `restore-drill --database cxj_restore_唯一后缀 --archive 同一文件 --sha256 校验值 --client-config /私有/mysql.cnf`。工具只创建新的演练库，已存在同名库会拒绝恢复。生产备份须另行实现异机保存、加密、保留周期和定期恢复验证。
+- 部署环境文件包含 `DB_PASSWORD`、`MYSQL_ROOT_PASSWORD`、基础 Compose 解析所需的 `REDIS_PASSWORD`。有真实 HTTPS 入口后填写 `MEDIA_PUBLIC_ORIGIN` 和精确的 `ADMIN_ALLOWED_ORIGINS`；未填写投放域名时图片审核发布会返回服务不可用。按需安全注入该环境的微信与 COS 配置。环境文件由部署账号持有，权限 0600，使用 Docker Compose 环境文件的引号规则。测试域名、备案、HTTPS、微信合法域名、正式协议、管理员初始化、人机验证、监控和备份仍需实际接入。
+- 迁移前在限制访问的目录执行 `python3 scripts/mysql_backup.py backup --client-config /私有/mysql.cnf --database chengxinjian --archive /私有备份/本次.sql.gz`。保存输出 SHA-256。恢复演练使用 `restore-drill --database cxj_restore_唯一后缀 --archive 同一文件 --sha256 校验值 --client-config /私有/mysql.cnf`。容器部署可用 `--docker-container <MySQL容器名>` 代替主机客户端配置，让备份和恢复使用同版本的容器客户端。工具只创建新的演练库，已存在同名库会拒绝恢复。生产备份须另行实现异机保存、加密、保留周期和定期恢复验证。
 - 若上线候选运行异常，先保留现场并停止向故障版本导流。仅在旧版本已验证兼容当前数据库和权限约束时切回其镜像。发生不兼容迁移时停止写入，从验证过的备份在独立库恢复，核对迁移后新增的业务数据并完成补偿，验证旧版本后再切换。不能仅启动阶段四旧代码来管理已有阶段五引用，也不能对有写入的库直接覆盖恢复。
