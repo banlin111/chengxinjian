@@ -1,0 +1,15 @@
+# 本地演示环境；不连接甲方资源，也不预置正式内容和价格。
+spring:
+  datasource:
+    url: ${DB_URL:jdbc:h2:file:./.local/chengxinjian;MODE=MySQL;DATABASE_TO_LOWER=TRUE;DB_CLOSE_ON_EXIT=FALSE}
+    username: ${DB_USERNAME:sa}
+    password: ${DB_PASSWORD:}
+    driver-class-name: org.h2.Driver
+server:
+  address: 127.0.0.1
+app:
+  auth:
+    captcha-mode: local
+    local-captcha-ticket: ${LOCAL_CAPTCHA_TICKET:}
+    bootstrap-username: ${LOCAL_ADMIN_USERNAME:admin}
+    bootstrap-password: ${LOCAL_ADMIN_PASSWORD:}

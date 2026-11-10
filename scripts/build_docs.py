@@ -1,10 +1,16 @@
 """Build README contract appendix and OpenAPI from the checked TypeScript schema."""
 from pathlib import Path
-import json, re, copy
+import json, re, copy, hashlib
 
 ROOT = Path(__file__).resolve().parents[1]
 raw = json.loads((ROOT / 'research/api-schema.json').read_text(encoding='utf-8'))
 defs = raw.get('definitions', {})
+# OpenAPI component keys cannot contain TypeScript generic punctuation. Keep
+# simple model names stable and use deterministic collision-safe generic names.
+schema_names = {k: k if re.fullmatch(r'[a-zA-Z0-9._-]+', k) else
+    re.sub(r'[^a-zA-Z0-9._-]+', '_', k).strip('_') + '_' + hashlib.sha256(k.encode()).hexdigest()[:8]
+    for k in defs}
+assert len(set(schema_names.values())) == len(schema_names), 'Schema name collision'
 
 def resolve(s):
     if '$ref' in s:
@@ -15,7 +21,8 @@ def convert(x):
     if isinstance(x, list): return [convert(v) for v in x]
     if not isinstance(x, dict): return x
     x = copy.deepcopy(x)
-    if '$ref' in x: x['$ref'] = x['$ref'].replace('#/definitions/', '#/components/schemas/')
+    if '$ref' in x and x['$ref'].startswith('#/definitions/'):
+        x['$ref'] = '#/components/schemas/' + schema_names[x['$ref'].split('/')[-1]]
     if 'const' in x: x['enum'] = [x.pop('const')]
     if isinstance(x.get('type'), list):
         types = x['type']
@@ -66,10 +73,10 @@ error = {'type':'object','required':['code','message','data','requestId','server
  'requestId':{'type':'string'}, 'serverTime':{'type':'string','format':'date-time'},
  'details':{'type':'array','items':{'type':'object','required':['field','reason'],'properties':{'field':{'type':'string'},'reason':{'type':'string'}}}}
 }}
-spec = {'openapi':'3.0.3','info':{'title':'澄心涧 API 契约草案','version':'0.1.0',
+spec = {'openapi':'3.0.3','info':{'title':'澄心涧 API 契约草案','version':'0.2.0',
  'description':'思维导图全范围；微信小程序与管理后台。Java/Spring Boot 实现。业务规则见 README。此文件不是已实现的服务。'},
  'servers':[{'url':'https://api.chengxinjian.example/api/v1','description':'示例域名，替换为测试或生产地址'}],
- 'paths':{},'components':{'securitySchemes':{'userBearer':{'type':'http','scheme':'bearer'},'adminBearer':{'type':'http','scheme':'bearer'}},'schemas':{k:convert(v) for k,v in defs.items()}}}
+ 'paths':{},'components':{'securitySchemes':{'userBearer':{'type':'http','scheme':'bearer'},'adminBearer':{'type':'http','scheme':'bearer'}},'schemas':{schema_names[k]:convert(v) for k,v in defs.items()}}}
 spec['components']['schemas']['ErrorEnvelope'] = error
 rows = []
 for key,s in raw['properties'].items():
@@ -93,7 +100,7 @@ for key,s in raw['properties'].items():
             if name in ('from','to','registeredFrom','registeredTo'): v['format']='date'
             if name=='month': v['pattern']=r'^\d{4}-\d{2}$'
             params.append({'name':name,'in':'query','required':name in q.get('required',[]),'schema':v})
-    if method=='POST' and path not in public_auth and path not in ('/auth/logout','/admin/auth/logout'):
+    if method=='POST' and path not in public_auth and path not in ('/auth/logout','/admin/auth/logout','/admin/assets/{id}/preview'):
         params.append({'name':'Idempotency-Key','in':'header','required':True,'schema':{'type':'string','format':'uuid'},'description':'相同意图重试复用，同键不同体返回409'})
     result=convert(parts['r'])
     env={'type':'object','required':['code','message','data','requestId','serverTime'],'properties':{
@@ -117,6 +124,6 @@ append+=f'共 **{len(rows)} 个方法/路径组合**，均加 `/api/v1` 前缀�
 append+='| 方法 | 路径 | 身份 | 查询 | 请求体 | data 返回值 |\n| --- | --- | --- | --- | --- | --- |\n'+'\n'.join(rows)+'\n'
 append+='\n### 11.2 数据字段、枚举与状态完整定义\n\n```typescript\n'+(ROOT/'contracts/models.ts').read_text(encoding='utf-8')+'```\n'
 append+='\n### 11.3 每个接口的请求与返回对应关系\n\n```typescript\n'+(ROOT/'contracts/api.ts').read_text(encoding='utf-8')+'```\n'
-append+='\n## 12. 修改契约与复查\n\n修改 `contracts/` 后，在本目录执行 `npm ci`、`npm run check`；它会检查类型、生成 JSON Schema、更新 OpenAPI 与本 README 附录。需要 Node.js 和 Python。不要只改生成的 README 附录。破坏性变更必须双方共同确认、升契约版本并同步前后端；新增可选字段一般可保持 `/v1`。\n\n本交付只做契约结构检查，不代表支付、直播、备案或真机测试通过；这些需甲方真实账号与开发实现后验证。\n'
+append+='\n## 12. 修改契约与复查\n\n修改 `contracts/` 后，在本目录执行 `npm ci`、`npm run check`；它会检查类型、生成 JSON Schema、更新 OpenAPI 与本 README 附录。需要 Node.js 和 Python。不要只改生成的 README 附录。破坏性变更必须双方共同确认、升契约版本并同步前后端；新增可选字段一般可保持 `/v1`。\n\n契约检查只验证结构；已实现后端与测试范围见 `docs/backend-development.md`。支付、直播、备案或真机测试仍需甲方真实账号与对应开发实现后验证。\n'
 readme.write_text(base+append,encoding='utf-8')
 print(f'Generated {len(rows)} API operations, {len(defs)} schemas; README {readme.stat().st_size} bytes')

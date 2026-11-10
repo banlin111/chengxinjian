@@ -1,0 +1,10 @@
+<view>独立后端联调工程</view>
+<view class="note">仅限开发环境。测试协议未经甲方批准，不用于正式注册。点击登录前请先阅读下方测试协议。</view>
+<button bindtap="readAgreements">读取并查看当前协议</button>
+<checkbox-group bindchange="consentChanged"><label><checkbox value="agree" checked="{{consented}}"/>我已阅读并同意以上两份本地测试协议</label></checkbox-group>
+<button bindtap="login" disabled="{{busy || !consented}}">真实 wx.login → 后端登录</button>
+<button bindtap="readMe" disabled="{{!loggedIn || busy}}">读取当前用户与设置</button>
+<button bindtap="refresh" disabled="{{!loggedIn || busy}}">刷新并轮换令牌</button>
+<button bindtap="uploadFixture" disabled="{{!loggedIn || busy}}">真实上传合成图片并验证</button>
+<button bindtap="logout" disabled="{{!loggedIn || busy}}">退出当前会话</button>
+<view class="status">{{status}}</view>

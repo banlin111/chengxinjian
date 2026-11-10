@@ -6,3 +6,11 @@ node_modules/
 *.p12
 *.key
 research/
+.tools/
+server/target/
+server/.local/
+.DS_Store
+*.log
+tools/wechat-login-probe/project.config.json
+tools/wechat-login-probe/project.private.config.json
+__pycache__/

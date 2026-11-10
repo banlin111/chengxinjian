@@ -1,10 +1,12 @@
 # 澄心涧：微信小程序与管理后台协作 README
 
-版本：0.1.0（开发契约草案）｜整理日期：2026-11-04｜两人开发
+版本：0.2.0（开发契约草案）｜上传契约共同确认：2026-11-10｜两人开发
 
 **本期范围：实现《澄心涧.pdf》思维导图的全部业务功能，先交付微信小程序及 Web 管理后台；后端采用 Java / Spring Boot，三份原型的配色都保留为可切换主题。APP 排在后续阶段。**
 
 本文定义目标方案与接口，不代表应用已开发完成。尚无甲方答案的业务数字均需确认，原型中的价格、用户量、奖励及文案不能作为正式配置。本文、接口类型和 OpenAPI 均为同一版本的草案，双方确认后冻结。
+
+**后端已开始实施：** `server/` 已包含工程基础、管理员会话、课程分类、微信用户身份/会话、协议与设置、讲师管理与关注，以及私有媒资上传、校验及后台预览（29 个业务接口）。已实现范围、启动方法、测试及后续工作见 [后端开发说明](docs/backend-development.md)。本文的完整接口附录仍是全量目标，不能视为所有接口均已实现。
 
 ## 1. 阅读顺序与文件
 
@@ -117,7 +119,7 @@ Apple Developer、App Store Connect 权限、Android 应用市场企业账号、
 | 架构 | 模块化单体 + 后台任务 + 事务 outbox | 两人开发优先减少服务运维数量，不从微服务/Kubernetes 起步 |
 | 契约 | 本 README + TypeScript DTO + OpenAPI 3.0 | 两人共用一份接口；Java DTO 由对应 JSON schema 落地 |
 
-[Spring Boot 官方系统要求](https://docs.spring.io/spring-boot/3.5/system-requirements.html)与[DCloud 快速上手](https://uniapp.dcloud.net.cn/quickstart.html)已查阅。确切版本和 lockfile 在建立实际工程时提交；本目录只含文档及契约，并没有伪装成已可运行的小程序。
+[Spring Boot 官方系统要求](https://docs.spring.io/spring-boot/3.5/system-requirements.html)与[DCloud 快速上手](https://uniapp.dcloud.net.cn/quickstart.html)已查阅。后端已锁定 Java 21 / Spring Boot 3.5.16 / Maven Wrapper 3.9.16；用户端工程与其 lockfile 由前端建立时提交。当前后端实现范围见开发说明，尚不是完整可上线的小程序。
 
 ### 4.3 创建与运行小程序
 
@@ -193,7 +195,7 @@ project/
   README.md
 ```
 
-当前交付目录尚未包含 apps/server 的实现。开始实施时建立单一 Git 仓库，功能分支开发，PR 合入 `main`；禁止各做一个完整压缩包到最后再拼。A 不直连 MySQL，B 不让前端猜数据库列名。每完成一个纵向功能就联调，不等全部页面做完。
+后端实现位于 `server/`，前端后续建立 `apps/mobile/` 和 `apps/admin/`。继续使用同一个 Git 仓库，功能分支开发，PR 合入 `main`；禁止各做一个完整压缩包到最后再拼。A 不直连 MySQL，B 不让前端猜数据库列名。每完成一个纵向功能就联调，不等全部页面做完。
 
 ### 7.2 HTTP 与数据格式
 
@@ -380,231 +382,231 @@ join 同时校验账号、会员、直播状态，返回短效播放 URL、一�
 
 | 方法 | 路径 | 身份 | 查询 | 请求体 | data 返回值 |
 | --- | --- | --- | --- | --- | --- |
-| `DELETE` | `/admin/comments/{id}` | 后台权限 | `—` | `Reason` | `OK` |
-| `DELETE` | `/admin/content/categories/{id}` | 后台权限 | `—` | `VersionReason` | `OK` |
-| `DELETE` | `/admin/content/courses/{id}` | 后台权限 | `—` | `VersionReason` | `OK` |
-| `DELETE` | `/admin/content/lessons/{id}` | 后台权限 | `—` | `VersionReason` | `OK` |
-| `DELETE` | `/admin/content/meditations/{id}` | 后台权限 | `—` | `VersionReason` | `OK` |
-| `DELETE` | `/admin/content/membership-plans/{id}` | 后台权限 | `—` | `VersionReason` | `OK` |
-| `DELETE` | `/admin/content/mix-presets/{id}` | 后台权限 | `—` | `VersionReason` | `OK` |
-| `DELETE` | `/admin/content/noises/{id}` | 后台权限 | `—` | `VersionReason` | `OK` |
-| `DELETE` | `/admin/content/notices/{id}` | 后台权限 | `—` | `VersionReason` | `OK` |
-| `DELETE` | `/admin/content/reward-rules/{id}` | 后台权限 | `—` | `VersionReason` | `OK` |
-| `DELETE` | `/admin/content/teachers/{id}` | 后台权限 | `—` | `VersionReason` | `OK` |
-| `DELETE` | `/admin/lives/{id}/messages/{messageId}` | 后台权限 | `—` | `Reason` | `OK` |
-| `DELETE` | `/admin/replays/{id}` | 后台权限 | `—` | `VersionReason` | `OK` |
-| `DELETE` | `/admin/roles/{id}` | 后台权限 | `—` | `—` | `OK` |
-| `DELETE` | `/comments/{id}` | 已登录 | `—` | `—` | `OK` |
-| `DELETE` | `/me/addresses/{id}` | 已登录 | `—` | `—` | `OK` |
-| `DELETE` | `/me/deletion` | 已登录 | `—` | `{reauthToken}` | `Deletion` |
-| `GET` | `/admin/accounts` | 后台权限 | `PageQuery` | `—` | `Page<AdminAccount>` |
-| `GET` | `/admin/agreements` | 后台权限 | `—` | `—` | `Agreement[]` |
-| `GET` | `/admin/audit-logs` | 后台权限 | `{action, from, operatorId, to}` | `—` | `Page<AuditLog>` |
-| `GET` | `/admin/comments` | 后台权限 | `{page, pageSize, status, targetId}` | `—` | `Page<Comment>` |
-| `GET` | `/admin/config/features` | 后台权限 | `—` | `—` | `FeatureConfig` |
-| `GET` | `/admin/config/home` | 后台权限 | `—` | `—` | `HomeConfig` |
-| `GET` | `/admin/config/moderation` | 后台权限 | `—` | `—` | `ModerationConfig` |
-| `GET` | `/admin/config/practice` | 后台权限 | `—` | `—` | `PracticeConfig` |
-| `GET` | `/admin/config/reminders` | 后台权限 | `—` | `—` | `ReminderConfig` |
-| `GET` | `/admin/content/categories` | 后台权限 | `AdminContentQuery` | `—` | `Page<Category>` |
-| `GET` | `/admin/content/categories/{id}` | 后台权限 | `—` | `—` | `Category` |
-| `GET` | `/admin/content/courses` | 后台权限 | `AdminContentQuery` | `—` | `Page<Course&{coverAssetId:string;}>` |
-| `GET` | `/admin/content/courses/{id}` | 后台权限 | `—` | `—` | `{coverAssetId}` |
-| `GET` | `/admin/content/lessons` | 后台权限 | `AdminContentQuery` | `—` | `Page<Lesson&{assetId:string;}>` |
-| `GET` | `/admin/content/lessons/{id}` | 后台权限 | `—` | `—` | `{assetId}` |
-| `GET` | `/admin/content/meditations` | 后台权限 | `AdminContentQuery` | `—` | `Page<Meditation&{coverAssetId:string;assetId:string;}>` |
-| `GET` | `/admin/content/meditations/{id}` | 后台权限 | `—` | `—` | `{assetId, coverAssetId}` |
-| `GET` | `/admin/content/membership-plans` | 后台权限 | `AdminContentQuery` | `—` | `Page<MembershipPlan>` |
-| `GET` | `/admin/content/membership-plans/{id}` | 后台权限 | `—` | `—` | `MembershipPlan` |
-| `GET` | `/admin/content/mix-presets` | 后台权限 | `AdminContentQuery` | `—` | `Page<MixPreset>` |
-| `GET` | `/admin/content/mix-presets/{id}` | 后台权限 | `—` | `—` | `MixPreset` |
-| `GET` | `/admin/content/noises` | 后台权限 | `AdminContentQuery` | `—` | `Page<Noise&{coverAssetId:string;assetId:string;}>` |
-| `GET` | `/admin/content/noises/{id}` | 后台权限 | `—` | `—` | `{assetId, coverAssetId}` |
-| `GET` | `/admin/content/notices` | 后台权限 | `AdminContentQuery` | `—` | `Page<AdminNotice>` |
-| `GET` | `/admin/content/notices/{id}` | 后台权限 | `—` | `—` | `AdminNotice` |
-| `GET` | `/admin/content/reward-rules` | 后台权限 | `AdminContentQuery` | `—` | `Page<RewardRule&{coverAssetId:string;}>` |
-| `GET` | `/admin/content/reward-rules/{id}` | 后台权限 | `—` | `—` | `{coverAssetId}` |
-| `GET` | `/admin/content/teachers` | 后台权限 | `AdminContentQuery` | `—` | `Page<Teacher&{avatarAssetId:string|null;userId:string|null;}>` |
-| `GET` | `/admin/content/teachers/{id}` | 后台权限 | `—` | `—` | `{avatarAssetId, userId}` |
-| `GET` | `/admin/finance/summary` | 后台权限 | `{from, to}` | `—` | `FinanceSummary` |
-| `GET` | `/admin/jobs/{id}` | 后台权限 | `—` | `—` | `Job` |
-| `GET` | `/admin/lives` | 后台权限 | `{status, teacherId}` | `—` | `Page<Live>` |
-| `GET` | `/admin/me` | 后台权限 | `—` | `—` | `AdminProfile` |
-| `GET` | `/admin/metrics` | 后台权限 | `MetricQuery` | `—` | `Metrics` |
-| `GET` | `/admin/orders` | 后台权限 | `FinanceQuery` | `—` | `Page<Order>` |
-| `GET` | `/admin/orders/{id}` | 后台权限 | `—` | `—` | `Order` |
-| `GET` | `/admin/orders/{id}/shipping-address` | 后台权限 | `—` | `—` | `AddressInput` |
-| `GET` | `/admin/permissions` | 后台权限 | `—` | `—` | `Permission[]` |
-| `GET` | `/admin/reconciliations` | 后台权限 | `{from, to}` | `—` | `Page<Reconciliation>` |
-| `GET` | `/admin/refunds` | 后台权限 | `{from, status, to}` | `—` | `Page<Refund>` |
-| `GET` | `/admin/replays` | 后台权限 | `{status}` | `—` | `Page<Replay>` |
-| `GET` | `/admin/reports` | 后台权限 | `{status}` | `—` | `Page<Report>` |
-| `GET` | `/admin/reward-claims` | 后台权限 | `{status, userId}` | `—` | `Page<RewardClaim>` |
-| `GET` | `/admin/roles` | 后台权限 | `—` | `—` | `Role[]` |
-| `GET` | `/admin/submissions` | 后台权限 | `ModerationQueueQuery` | `—` | `Page<Submission>` |
-| `GET` | `/admin/users` | 后台权限 | `UserQuery` | `—` | `Page<AdminUser>` |
-| `GET` | `/admin/users/{id}` | 后台权限 | `—` | `—` | `AdminUser` |
-| `GET` | `/admin/users/{id}/activity` | 后台权限 | `{from, learningPage, livePage, to}` | `—` | `UserActivity` |
-| `GET` | `/admin/users/{id}/grants` | 后台权限 | `PageQuery` | `—` | `Page<Grant>` |
+| `GET` | `/bootstrap` | 公开/可选登录 | `{platform, clientVersion, sdkVersion}` | `—` | `Bootstrap` |
 | `GET` | `/agreements/{type}` | 公开/可选登录 | `{version}` | `—` | `Agreement` |
-| `GET` | `/assets/{id}` | 已登录 | `—` | `—` | `Asset` |
-| `GET` | `/bootstrap` | 公开/可选登录 | `{clientVersion, platform, sdkVersion}` | `—` | `Bootstrap` |
+| `POST` | `/auth/wechat/login` | 公开/可选登录 | `—` | `WxLogin` | `LoginResult` |
+| `POST` | `/auth/sms` | 公开/可选登录 | `—` | `SmsSend` | `SmsReceipt` |
+| `POST` | `/auth/register` | 公开/可选登录 | `—` | `{challengeId, code, password, agreements}` | `LoginResult` |
+| `POST` | `/auth/sms/login` | 公开/可选登录 | `—` | `{challengeId, code, agreements}` | `LoginResult` |
+| `POST` | `/auth/password/login` | 公开/可选登录 | `—` | `{phone, password, captchaTicket}` | `LoginResult` |
+| `POST` | `/auth/password/reset` | 公开/可选登录 | `—` | `{challengeId, code, newPassword}` | `OK` |
+| `POST` | `/auth/refresh` | 公开/可选登录 | `—` | `{refreshToken}` | `AuthTokens` |
+| `POST` | `/auth/logout` | 已登录 | `—` | `{refreshToken}` | `OK` |
+| `POST` | `/auth/reauth` | 已登录 | `—` | `Reauth` | `ReauthResult` |
+| `POST` | `/auth/reauth/wechat` | 已登录 | `—` | `{code, purpose}` | `ReauthResult` |
+| `PUT` | `/me/phone/wechat` | 已登录 | `—` | `{phoneCode, reauthToken}` | `User` |
+| `PUT` | `/me/phone` | 已登录 | `—` | `{challengeId, code, reauthToken}` | `User` |
+| `PUT` | `/me/password` | 已登录 | `—` | `{newPassword, reauthToken}` | `OK` |
+| `POST` | `/me/wechat-binding` | 已登录 | `—` | `{code, reauthToken}` | `User` |
+| `GET` | `/me` | 已登录 | `—` | `—` | `User` |
+| `PATCH` | `/me` | 已登录 | `—` | `{nickname, avatarAssetId}` | `User` |
+| `GET` | `/me/settings` | 已登录 | `—` | `—` | `Settings` |
+| `PUT` | `/me/settings` | 已登录 | `—` | `Settings` | `Settings` |
+| `GET` | `/me/deletion` | 已登录 | `—` | `—` | `Deletion / null` |
+| `POST` | `/me/deletion` | 已登录 | `—` | `{reauthToken, reason, agreementVersion}` | `Deletion` |
+| `DELETE` | `/me/deletion` | 已登录 | `—` | `{reauthToken}` | `Deletion` |
+| `GET` | `/home` | 公开/可选登录 | `—` | `—` | `Home` |
+| `GET` | `/notices` | 公开/可选登录 | `PageQuery` | `—` | `Page<Notice>` |
+| `GET` | `/notices/{id}` | 公开/可选登录 | `—` | `—` | `Notice` |
+| `PUT` | `/me/notices/{id}/read` | 已登录 | `—` | `—` | `OK` |
+| `GET` | `/search` | 公开/可选登录 | `SearchQuery` | `—` | `Page<SearchHit>` |
+| `GET` | `/search/hot` | 公开/可选登录 | `—` | `—` | `{keywords, updatedAt}` |
 | `GET` | `/categories` | 公开/可选登录 | `{kind}` | `—` | `Category[]` |
-| `GET` | `/comments` | 已登录 | `CommentQuery` | `—` | `Page<Comment>` |
+| `GET` | `/teachers` | 公开/可选登录 | `{page, pageSize, q}` | `—` | `Page<Teacher>` |
+| `GET` | `/teachers/{id}` | 公开/可选登录 | `—` | `—` | `Teacher` |
+| `PUT` | `/me/follows/{teacherId}` | 已登录 | `—` | `{followed}` | `OK` |
 | `GET` | `/courses` | 公开/可选登录 | `ContentQuery` | `—` | `Page<Course>` |
 | `GET` | `/courses/{id}` | 公开/可选登录 | `—` | `—` | `Course` |
 | `GET` | `/courses/{id}/lessons` | 公开/可选登录 | `PageQuery` | `—` | `Page<Lesson>` |
-| `GET` | `/home` | 公开/可选登录 | `—` | `—` | `Home` |
-| `GET` | `/lives` | 公开/可选登录 | `{status}` | `—` | `Page<Live>` |
-| `GET` | `/lives/{id}` | 公开/可选登录 | `—` | `—` | `Live` |
-| `GET` | `/lives/{id}/messages` | 已登录 | `{afterId, limit}` | `—` | `{items, nextAfterId}` |
-| `GET` | `/me` | 已登录 | `—` | `—` | `User` |
-| `GET` | `/me/addresses` | 已登录 | `—` | `—` | `Address[]` |
-| `GET` | `/me/checkins` | 已登录 | `{month}` | `—` | `{checkedInToday, dates, streakDays}` |
-| `GET` | `/me/deletion` | 已登录 | `—` | `—` | `Deletion / null` |
-| `GET` | `/me/entitlements` | 已登录 | `PageQuery` | `—` | `Page<Entitlement>` |
-| `GET` | `/me/favorites` | 已登录 | `{kind}` | `—` | `Page<{target:Target;title:string;coverUrl:string;savedAt:string;}>` |
-| `GET` | `/me/learning` | 已登录 | `{state}` | `—` | `Page<LearningItem>` |
-| `GET` | `/me/membership` | 已登录 | `—` | `—` | `Membership` |
-| `GET` | `/me/orders` | 已登录 | `{kind, refundStatus, status}` | `—` | `Page<Order>` |
-| `GET` | `/me/practice/sessions` | 已登录 | `{from, to}` | `—` | `Page<Practice>` |
-| `GET` | `/me/practice/stats` | 已登录 | `{from, to}` | `—` | `PracticeStats` |
-| `GET` | `/me/practice/submissions` | 已登录 | `PageQuery` | `—` | `Page<Submission>` |
-| `GET` | `/me/reward-claims` | 已登录 | `PageQuery` | `—` | `Page<RewardClaim>` |
-| `GET` | `/me/settings` | 已登录 | `—` | `—` | `Settings` |
 | `GET` | `/meditations` | 公开/可选登录 | `ContentQuery` | `—` | `Page<Meditation>` |
 | `GET` | `/meditations/{id}` | 公开/可选登录 | `—` | `—` | `Meditation` |
-| `GET` | `/membership/plans` | 公开/可选登录 | `—` | `—` | `MembershipPlan[]` |
+| `GET` | `/noises` | 公开/可选登录 | `{page, pageSize, categoryId}` | `—` | `Page<Noise>` |
 | `GET` | `/mix-presets` | 公开/可选登录 | `PageQuery` | `—` | `Page<MixPreset>` |
-| `GET` | `/noises` | 公开/可选登录 | `{categoryId}` | `—` | `Page<Noise>` |
-| `GET` | `/notices` | 公开/可选登录 | `PageQuery` | `—` | `Page<Notice>` |
-| `GET` | `/notices/{id}` | 公开/可选登录 | `—` | `—` | `Notice` |
-| `GET` | `/orders/{id}` | 已登录 | `—` | `—` | `Order` |
-| `GET` | `/orders/{id}/shipment` | 已登录 | `—` | `—` | `Shipment` |
-| `GET` | `/payments/{id}` | 已登录 | `—` | `—` | `PaymentState` |
-| `GET` | `/practice/sessions/{id}` | 已登录 | `—` | `—` | `Practice` |
-| `GET` | `/practice/submissions/{id}` | 已登录 | `—` | `—` | `Submission` |
-| `GET` | `/refunds/{id}` | 已登录 | `—` | `—` | `Refund` |
-| `GET` | `/regions` | 公开/可选登录 | `{parentCode}` | `—` | `{code, level, name}[]` |
-| `GET` | `/replays` | 公开/可选登录 | `{teacherId}` | `—` | `Page<Replay>` |
-| `GET` | `/replays/{id}` | 公开/可选登录 | `—` | `—` | `Replay` |
-| `GET` | `/reward-claims/{id}` | 已登录 | `—` | `—` | `RewardClaim` |
-| `GET` | `/rewards` | 已登录 | `PageQuery` | `—` | `Page<RewardEligibility>` |
-| `GET` | `/search` | 公开/可选登录 | `SearchQuery` | `—` | `Page<SearchHit>` |
-| `GET` | `/search/hot` | 公开/可选登录 | `—` | `—` | `{keywords, updatedAt}` |
-| `GET` | `/teachers` | 公开/可选登录 | `{q}` | `—` | `Page<Teacher>` |
-| `GET` | `/teachers/{id}` | 公开/可选登录 | `—` | `—` | `Teacher` |
-| `PATCH` | `/admin/replays/{id}` | 后台权限 | `—` | `{chapters, status, title, version}` | `Replay` |
-| `PATCH` | `/me` | 已登录 | `—` | `{avatarAssetId, nickname}` | `User` |
-| `POST` | `/admin/accounts` | 后台权限 | `—` | `{displayName, enabled, initialPassword, roleIds, teacherId, username}` | `AdminAccount` |
-| `POST` | `/admin/accounts/{id}/reset-password` | 后台权限 | `—` | `{newPassword, reason}` | `OK` |
-| `POST` | `/admin/agreements` | 后台权限 | `—` | `Agreement` | `Agreement` |
-| `POST` | `/admin/assets/{id}/preview` | 后台权限 | `—` | `—` | `{expiresAt, url}` |
-| `POST` | `/admin/auth/login` | 公开/可选登录 | `—` | `AdminLogin` | `AdminAuth` |
-| `POST` | `/admin/auth/logout` | 后台权限 | `—` | `{refreshToken}` | `OK` |
-| `POST` | `/admin/auth/refresh` | 公开/可选登录 | `—` | `{refreshToken}` | `AuthTokens` |
-| `POST` | `/admin/comments/{id}/review` | 后台权限 | `—` | `ReviewDecision` | `Comment` |
-| `POST` | `/admin/content/categories` | 后台权限 | `—` | `AdminCategoryInput` | `Category` |
-| `POST` | `/admin/content/courses` | 后台权限 | `—` | `AdminCourseInput` | `{coverAssetId}` |
-| `POST` | `/admin/content/lessons` | 后台权限 | `—` | `AdminLessonInput` | `{assetId}` |
-| `POST` | `/admin/content/meditations` | 后台权限 | `—` | `AdminMeditationInput` | `{assetId, coverAssetId}` |
-| `POST` | `/admin/content/membership-plans` | 后台权限 | `—` | `AdminPlanInput` | `MembershipPlan` |
-| `POST` | `/admin/content/mix-presets` | 后台权限 | `—` | `AdminMixInput` | `MixPreset` |
-| `POST` | `/admin/content/noises` | 后台权限 | `—` | `AdminNoiseInput` | `{assetId, coverAssetId}` |
-| `POST` | `/admin/content/notices` | 后台权限 | `—` | `AdminNoticeInput` | `AdminNotice` |
-| `POST` | `/admin/content/reward-rules` | 后台权限 | `—` | `AdminRewardInput` | `{coverAssetId}` |
-| `POST` | `/admin/content/teachers` | 后台权限 | `—` | `AdminTeacherInput` | `{avatarAssetId, userId}` |
-| `POST` | `/admin/exports` | 后台权限 | `—` | `{from, kind, to}` | `Job` |
-| `POST` | `/admin/grants/{id}/revoke` | 后台权限 | `—` | `Reason` | `Grant` |
-| `POST` | `/admin/lives` | 后台权限 | `—` | `AdminLiveInput` | `Live` |
-| `POST` | `/admin/lives/{id}/actions` | 后台权限 | `—` | `{action, reason, version}` | `Live` |
-| `POST` | `/admin/lives/{id}/stream-credentials` | 后台权限 | `—` | `—` | `StreamCredential` |
-| `POST` | `/admin/orders/{id}/shipments` | 后台权限 | `—` | `{carrierCode, reason, trackingNo}` | `Shipment` |
-| `POST` | `/admin/reconciliations` | 后台权限 | `—` | `{date}` | `Reconciliation` |
-| `POST` | `/admin/refunds/{id}/retry` | 后台权限 | `—` | `Reason` | `Refund` |
-| `POST` | `/admin/refunds/{id}/review` | 后台权限 | `—` | `ReviewDecision` | `Refund` |
-| `POST` | `/admin/replays/{id}/course` | 后台权限 | `—` | `{courseId, sort, title, trialSeconds}` | `Job` |
-| `POST` | `/admin/replays/{id}/retry` | 后台权限 | `—` | `—` | `Job` |
-| `POST` | `/admin/reports/{id}/resolve` | 后台权限 | `—` | `{action, decision}` | `Report` |
-| `POST` | `/admin/roles` | 后台权限 | `—` | `RoleInput` | `Role` |
-| `POST` | `/admin/submissions/{id}/review` | 后台权限 | `—` | `ReviewDecision` | `Submission` |
-| `POST` | `/admin/users/{id}/grants` | 后台权限 | `—` | `GrantInput` | `Grant` |
-| `POST` | `/auth/logout` | 已登录 | `—` | `{refreshToken}` | `OK` |
-| `POST` | `/auth/password/login` | 公开/可选登录 | `—` | `{captchaTicket, password, phone}` | `LoginResult` |
-| `POST` | `/auth/password/reset` | 公开/可选登录 | `—` | `{challengeId, code, newPassword}` | `OK` |
-| `POST` | `/auth/reauth` | 已登录 | `—` | `Reauth` | `ReauthResult` |
-| `POST` | `/auth/reauth/wechat` | 已登录 | `—` | `{code, purpose}` | `ReauthResult` |
-| `POST` | `/auth/refresh` | 公开/可选登录 | `—` | `{refreshToken}` | `AuthTokens` |
-| `POST` | `/auth/register` | 公开/可选登录 | `—` | `{agreements, challengeId, code, password}` | `LoginResult` |
-| `POST` | `/auth/sms` | 公开/可选登录 | `—` | `SmsSend` | `SmsReceipt` |
-| `POST` | `/auth/sms/login` | 公开/可选登录 | `—` | `{agreements, challengeId, code}` | `LoginResult` |
-| `POST` | `/auth/wechat/login` | 公开/可选登录 | `—` | `WxLogin` | `LoginResult` |
-| `POST` | `/checkins` | 已登录 | `—` | `{practiceSessionId}` | `Checkin` |
-| `POST` | `/comments` | 已登录 | `—` | `CommentCreate` | `Comment` |
-| `POST` | `/lives/{id}/join` | 已登录 | `—` | `—` | `LiveJoin` |
-| `POST` | `/lives/{id}/leave` | 已登录 | `—` | `{participationId}` | `OK` |
-| `POST` | `/lives/{id}/likes` | 已登录 | `—` | `{count, eventId}` | `{total}` |
-| `POST` | `/lives/{id}/messages` | 已登录 | `—` | `{clientMessageId, kind, replyToId, text}` | `LiveMessage` |
-| `POST` | `/me/addresses` | 已登录 | `—` | `AddressInput` | `Address` |
-| `POST` | `/me/deletion` | 已登录 | `—` | `{agreementVersion, reason, reauthToken}` | `Deletion` |
-| `POST` | `/me/subscription-consents` | 已登录 | `—` | `SubscriptionConsent` | `OK` |
-| `POST` | `/me/wechat-binding` | 已登录 | `—` | `{code, reauthToken}` | `User` |
-| `POST` | `/order-quotes` | 已登录 | `—` | `QuoteRequest` | `Quote` |
-| `POST` | `/orders` | 已登录 | `—` | `{agreements, quoteId}` | `Order` |
-| `POST` | `/orders/{id}/cancel` | 已登录 | `—` | `Reason` | `Order` |
-| `POST` | `/orders/{id}/confirm-receipt` | 已登录 | `—` | `—` | `Order` |
-| `POST` | `/orders/{id}/payments` | 已登录 | `—` | `{platform, wxCode}` | `VirtualPayment` |
-| `POST` | `/orders/{id}/refunds` | 已登录 | `—` | `{reason}` | `Refund` |
 | `POST` | `/playbacks` | 已登录 | `—` | `PlaybackRequest` | `Playback` |
 | `POST` | `/playbacks/{id}/events` | 已登录 | `—` | `PlaybackEvent` | `PlaybackAck` |
 | `POST` | `/playbacks/{id}/renew` | 已登录 | `—` | `—` | `Playback` |
+| `GET` | `/me/learning` | 已登录 | `{page, pageSize, state}` | `—` | `Page<LearningItem>` |
+| `GET` | `/me/favorites` | 已登录 | `{page, pageSize, kind}` | `—` | `Page<{target:Target;title:string;coverUrl:string;savedAt:string;}>` |
+| `PUT` | `/me/favorites/{kind}/{id}` | 已登录 | `—` | `{favorite}` | `OK` |
+| `PUT` | `/me/likes/{kind}/{id}` | 已登录 | `—` | `{liked}` | `{liked, count}` |
+| `GET` | `/comments` | 已登录 | `CommentQuery` | `—` | `Page<Comment>` |
+| `POST` | `/comments` | 已登录 | `—` | `CommentCreate` | `Comment` |
+| `DELETE` | `/comments/{id}` | 已登录 | `—` | `—` | `OK` |
+| `PUT` | `/comments/{id}/like` | 已登录 | `—` | `{liked}` | `{liked, count}` |
+| `POST` | `/reports` | 已登录 | `—` | `{targetType, targetId, reason}` | `Report` |
 | `POST` | `/practice/sessions` | 已登录 | `—` | `PracticeStart` | `Practice` |
+| `GET` | `/practice/sessions/{id}` | 已登录 | `—` | `—` | `Practice` |
 | `POST` | `/practice/sessions/{id}/events` | 已登录 | `—` | `PracticeEvent` | `Practice` |
-| `POST` | `/practice/submissions` | 已登录 | `—` | `{assetId, practiceSessionId, text}` | `Submission` |
-| `POST` | `/reports` | 已登录 | `—` | `{reason, targetId, targetType}` | `Report` |
-| `POST` | `/reward-claims` | 已登录 | `—` | `{addressId, ruleId, submissionId}` | `RewardClaim` |
+| `GET` | `/me/practice/sessions` | 已登录 | `{page, pageSize, from, to}` | `—` | `Page<Practice>` |
+| `GET` | `/me/practice/stats` | 已登录 | `{from, to}` | `—` | `PracticeStats` |
+| `POST` | `/checkins` | 已登录 | `—` | `{practiceSessionId}` | `Checkin` |
+| `GET` | `/me/checkins` | 已登录 | `{month}` | `—` | `{dates, streakDays, checkedInToday}` |
+| `GET` | `/rewards` | 已登录 | `PageQuery` | `—` | `Page<RewardEligibility>` |
+| `POST` | `/reward-claims` | 已登录 | `—` | `{ruleId, submissionId, addressId}` | `RewardClaim` |
+| `GET` | `/me/reward-claims` | 已登录 | `PageQuery` | `—` | `Page<RewardClaim>` |
+| `GET` | `/reward-claims/{id}` | 已登录 | `—` | `—` | `RewardClaim` |
+| `PUT` | `/reward-claims/{id}/address` | 已登录 | `—` | `{addressId, version}` | `RewardClaim` |
+| `POST` | `/practice/submissions` | 已登录 | `—` | `{practiceSessionId, assetId, text}` | `Submission` |
+| `GET` | `/me/practice/submissions` | 已登录 | `PageQuery` | `—` | `Page<Submission>` |
+| `GET` | `/practice/submissions/{id}` | 已登录 | `—` | `—` | `Submission` |
 | `POST` | `/uploads` | 已登录 | `—` | `UploadRequest` | `UploadTicket` |
 | `POST` | `/uploads/{id}/complete` | 已登录 | `—` | `{sha256}` | `Asset` |
-| `PUT` | `/admin/accounts/{id}` | 后台权限 | `—` | `{displayName, enabled, roleIds, teacherId, username, version}` | `AdminAccount` |
-| `PUT` | `/admin/config/features` | 后台权限 | `—` | `FeatureConfig` | `FeatureConfig` |
-| `PUT` | `/admin/config/home` | 后台权限 | `—` | `HomeConfig` | `HomeConfig` |
-| `PUT` | `/admin/config/moderation` | 后台权限 | `—` | `ModerationConfig` | `ModerationConfig` |
-| `PUT` | `/admin/config/practice` | 后台权限 | `—` | `PracticeConfig` | `PracticeConfig` |
-| `PUT` | `/admin/config/reminders` | 后台权限 | `—` | `ReminderConfig` | `ReminderConfig` |
-| `PUT` | `/admin/content/categories/{id}` | 后台权限 | `—` | `{version}` | `Category` |
-| `PUT` | `/admin/content/courses/{id}` | 后台权限 | `—` | `{version}` | `{coverAssetId}` |
-| `PUT` | `/admin/content/lessons/{id}` | 后台权限 | `—` | `{version}` | `{assetId}` |
-| `PUT` | `/admin/content/meditations/{id}` | 后台权限 | `—` | `{version}` | `{assetId, coverAssetId}` |
-| `PUT` | `/admin/content/membership-plans/{id}` | 后台权限 | `—` | `{version}` | `MembershipPlan` |
-| `PUT` | `/admin/content/mix-presets/{id}` | 后台权限 | `—` | `{version}` | `MixPreset` |
-| `PUT` | `/admin/content/noises/{id}` | 后台权限 | `—` | `{version}` | `{assetId, coverAssetId}` |
-| `PUT` | `/admin/content/notices/{id}` | 后台权限 | `—` | `{version}` | `AdminNotice` |
-| `PUT` | `/admin/content/reward-rules/{id}` | 后台权限 | `—` | `{version}` | `{coverAssetId}` |
-| `PUT` | `/admin/content/teachers/{id}` | 后台权限 | `—` | `{version}` | `{avatarAssetId, userId}` |
-| `PUT` | `/admin/lives/{id}` | 后台权限 | `—` | `{version}` | `Live` |
-| `PUT` | `/admin/lives/{id}/comments` | 后台权限 | `—` | `{enabled, version}` | `Live` |
-| `PUT` | `/admin/lives/{id}/mutes/{userId}` | 后台权限 | `—` | `{reason, until}` | `OK` |
-| `PUT` | `/admin/roles/{id}` | 后台权限 | `—` | `{version}` | `Role` |
-| `PUT` | `/admin/shipments/{id}` | 后台权限 | `—` | `{carrierCode, trackingNo}` | `Shipment` |
-| `PUT` | `/admin/users/{id}/roles` | 后台权限 | `—` | `{reason, roles}` | `AdminUser` |
-| `PUT` | `/admin/users/{id}/status` | 后台权限 | `—` | `{reason, status, version}` | `AdminUser` |
-| `PUT` | `/comments/{id}/like` | 已登录 | `—` | `{liked}` | `{count, liked}` |
+| `GET` | `/assets/{id}` | 已登录 | `—` | `—` | `Asset` |
+| `GET` | `/lives` | 公开/可选登录 | `{page, pageSize, status}` | `—` | `Page<Live>` |
+| `GET` | `/lives/{id}` | 公开/可选登录 | `—` | `—` | `Live` |
 | `PUT` | `/lives/{id}/reservation` | 已登录 | `—` | `{reserved}` | `{reserved}` |
-| `PUT` | `/me/addresses/{id}` | 已登录 | `—` | `{version}` | `Address` |
-| `PUT` | `/me/favorites/{kind}/{id}` | 已登录 | `—` | `{favorite}` | `OK` |
-| `PUT` | `/me/follows/{teacherId}` | 已登录 | `—` | `{followed}` | `OK` |
-| `PUT` | `/me/likes/{kind}/{id}` | 已登录 | `—` | `{liked}` | `{count, liked}` |
-| `PUT` | `/me/notices/{id}/read` | 已登录 | `—` | `—` | `OK` |
-| `PUT` | `/me/password` | 已登录 | `—` | `{newPassword, reauthToken}` | `OK` |
-| `PUT` | `/me/phone` | 已登录 | `—` | `{challengeId, code, reauthToken}` | `User` |
-| `PUT` | `/me/phone/wechat` | 已登录 | `—` | `{phoneCode, reauthToken}` | `User` |
-| `PUT` | `/me/settings` | 已登录 | `—` | `Settings` | `Settings` |
-| `PUT` | `/reward-claims/{id}/address` | 已登录 | `—` | `{addressId, version}` | `RewardClaim` |
+| `POST` | `/me/subscription-consents` | 已登录 | `—` | `SubscriptionConsent` | `OK` |
+| `POST` | `/lives/{id}/join` | 已登录 | `—` | `—` | `LiveJoin` |
+| `POST` | `/lives/{id}/leave` | 已登录 | `—` | `{participationId}` | `OK` |
+| `GET` | `/lives/{id}/messages` | 已登录 | `{afterId, limit}` | `—` | `{items, nextAfterId}` |
+| `POST` | `/lives/{id}/messages` | 已登录 | `—` | `{clientMessageId, kind, text, replyToId}` | `LiveMessage` |
+| `POST` | `/lives/{id}/likes` | 已登录 | `—` | `{eventId, count}` | `{total}` |
+| `GET` | `/replays` | 公开/可选登录 | `{page, pageSize, teacherId}` | `—` | `Page<Replay>` |
+| `GET` | `/replays/{id}` | 公开/可选登录 | `—` | `—` | `Replay` |
+| `GET` | `/membership/plans` | 公开/可选登录 | `—` | `—` | `MembershipPlan[]` |
+| `GET` | `/me/membership` | 已登录 | `—` | `—` | `Membership` |
+| `GET` | `/me/entitlements` | 已登录 | `PageQuery` | `—` | `Page<Entitlement>` |
+| `POST` | `/order-quotes` | 已登录 | `—` | `QuoteRequest` | `Quote` |
+| `POST` | `/orders` | 已登录 | `—` | `{quoteId, agreements}` | `Order` |
+| `GET` | `/me/orders` | 已登录 | `{page, pageSize, kind, status, refundStatus}` | `—` | `Page<Order>` |
+| `GET` | `/orders/{id}` | 已登录 | `—` | `—` | `Order` |
+| `POST` | `/orders/{id}/cancel` | 已登录 | `—` | `Reason` | `Order` |
+| `POST` | `/orders/{id}/payments` | 已登录 | `—` | `{platform, wxCode}` | `VirtualPayment` |
+| `GET` | `/payments/{id}` | 已登录 | `—` | `—` | `PaymentState` |
+| `POST` | `/orders/{id}/refunds` | 已登录 | `—` | `{reason}` | `Refund` |
+| `GET` | `/refunds/{id}` | 已登录 | `—` | `—` | `Refund` |
+| `GET` | `/orders/{id}/shipment` | 已登录 | `—` | `—` | `Shipment` |
+| `POST` | `/orders/{id}/confirm-receipt` | 已登录 | `—` | `—` | `Order` |
+| `GET` | `/me/addresses` | 已登录 | `—` | `—` | `Address[]` |
+| `POST` | `/me/addresses` | 已登录 | `—` | `AddressInput` | `Address` |
+| `PUT` | `/me/addresses/{id}` | 已登录 | `—` | `{recipient, phone, provinceCode, cityCode, districtCode, detail, isDefault, version}` | `Address` |
+| `DELETE` | `/me/addresses/{id}` | 已登录 | `—` | `—` | `OK` |
+| `GET` | `/regions` | 公开/可选登录 | `{parentCode}` | `—` | `{code, name, level}[]` |
+| `POST` | `/admin/auth/login` | 公开/可选登录 | `—` | `AdminLogin` | `AdminAuth` |
+| `POST` | `/admin/auth/refresh` | 公开/可选登录 | `—` | `{refreshToken}` | `AuthTokens` |
+| `POST` | `/admin/auth/logout` | 后台权限 | `—` | `{refreshToken}` | `OK` |
+| `GET` | `/admin/me` | 后台权限 | `—` | `—` | `AdminProfile` |
+| `GET` | `/admin/users` | 后台权限 | `UserQuery` | `—` | `Page<AdminUser>` |
+| `GET` | `/admin/users/{id}` | 后台权限 | `—` | `—` | `AdminUser` |
+| `PUT` | `/admin/users/{id}/status` | 后台权限 | `—` | `{version, reason, status}` | `AdminUser` |
+| `PUT` | `/admin/users/{id}/roles` | 后台权限 | `—` | `{roles, reason}` | `AdminUser` |
+| `GET` | `/admin/users/{id}/activity` | 后台权限 | `{from, to, learningPage, livePage}` | `—` | `UserActivity` |
+| `GET` | `/admin/users/{id}/grants` | 后台权限 | `PageQuery` | `—` | `Page<Grant>` |
+| `POST` | `/admin/users/{id}/grants` | 后台权限 | `—` | `GrantInput` | `Grant` |
+| `POST` | `/admin/grants/{id}/revoke` | 后台权限 | `—` | `Reason` | `Grant` |
+| `GET` | `/admin/lives` | 后台权限 | `{page, pageSize, status, teacherId}` | `—` | `Page<Live>` |
+| `POST` | `/admin/lives` | 后台权限 | `—` | `AdminLiveInput` | `Live` |
+| `PUT` | `/admin/lives/{id}` | 后台权限 | `—` | `{title, description, coverAssetId, teacherId, scheduledAt, accessPolicy, replayEnabled, commentsEnabled, version}` | `Live` |
+| `POST` | `/admin/lives/{id}/actions` | 后台权限 | `—` | `{version, reason, action}` | `Live` |
+| `POST` | `/admin/lives/{id}/stream-credentials` | 后台权限 | `—` | `—` | `StreamCredential` |
+| `PUT` | `/admin/lives/{id}/comments` | 后台权限 | `—` | `{enabled, version}` | `Live` |
+| `PUT` | `/admin/lives/{id}/mutes/{userId}` | 后台权限 | `—` | `{until, reason}` | `OK` |
+| `DELETE` | `/admin/lives/{id}/messages/{messageId}` | 后台权限 | `—` | `Reason` | `OK` |
+| `GET` | `/admin/replays` | 后台权限 | `{page, pageSize, status}` | `—` | `Page<Replay>` |
+| `PATCH` | `/admin/replays/{id}` | 后台权限 | `—` | `{title, chapters, status, version}` | `Replay` |
+| `DELETE` | `/admin/replays/{id}` | 后台权限 | `—` | `VersionReason` | `OK` |
+| `POST` | `/admin/replays/{id}/retry` | 后台权限 | `—` | `—` | `Job` |
+| `POST` | `/admin/replays/{id}/course` | 后台权限 | `—` | `{courseId, title, sort, trialSeconds}` | `Job` |
+| `GET` | `/admin/config/home` | 后台权限 | `—` | `—` | `HomeConfig` |
+| `PUT` | `/admin/config/home` | 后台权限 | `—` | `HomeConfig` | `HomeConfig` |
+| `GET` | `/admin/config/practice` | 后台权限 | `—` | `—` | `PracticeConfig` |
+| `PUT` | `/admin/config/practice` | 后台权限 | `—` | `PracticeConfig` | `PracticeConfig` |
+| `GET` | `/admin/config/reminders` | 后台权限 | `—` | `—` | `ReminderConfig` |
+| `PUT` | `/admin/config/reminders` | 后台权限 | `—` | `ReminderConfig` | `ReminderConfig` |
+| `GET` | `/admin/config/moderation` | 后台权限 | `—` | `—` | `ModerationConfig` |
+| `PUT` | `/admin/config/moderation` | 后台权限 | `—` | `ModerationConfig` | `ModerationConfig` |
+| `GET` | `/admin/config/features` | 后台权限 | `—` | `—` | `FeatureConfig` |
+| `PUT` | `/admin/config/features` | 后台权限 | `—` | `FeatureConfig` | `FeatureConfig` |
+| `GET` | `/admin/agreements` | 后台权限 | `—` | `—` | `Agreement[]` |
+| `POST` | `/admin/agreements` | 后台权限 | `—` | `Agreement` | `Agreement` |
+| `GET` | `/admin/comments` | 后台权限 | `{status, page, pageSize, targetId}` | `—` | `Page<Comment>` |
+| `POST` | `/admin/comments/{id}/review` | 后台权限 | `—` | `ReviewDecision` | `Comment` |
+| `DELETE` | `/admin/comments/{id}` | 后台权限 | `—` | `Reason` | `OK` |
+| `GET` | `/admin/submissions` | 后台权限 | `ModerationQueueQuery` | `—` | `Page<Submission>` |
+| `POST` | `/admin/submissions/{id}/review` | 后台权限 | `—` | `ReviewDecision` | `Submission` |
+| `POST` | `/admin/assets/{id}/preview` | 后台权限 | `—` | `—` | `{url, expiresAt}` |
+| `GET` | `/admin/reports` | 后台权限 | `{page, pageSize, status}` | `—` | `Page<Report>` |
+| `POST` | `/admin/reports/{id}/resolve` | 后台权限 | `—` | `{version, reason, decision, action}` | `Report` |
+| `GET` | `/admin/reward-claims` | 后台权限 | `{page, pageSize, status, userId}` | `—` | `Page<RewardClaim>` |
+| `GET` | `/admin/orders` | 后台权限 | `FinanceQuery` | `—` | `Page<Order>` |
+| `GET` | `/admin/orders/{id}` | 后台权限 | `—` | `—` | `Order` |
+| `GET` | `/admin/orders/{id}/shipping-address` | 后台权限 | `—` | `—` | `AddressInput` |
+| `POST` | `/admin/orders/{id}/shipments` | 后台权限 | `—` | `{carrierCode, trackingNo, reason}` | `Shipment` |
+| `PUT` | `/admin/shipments/{id}` | 后台权限 | `—` | `{version, reason, carrierCode, trackingNo}` | `Shipment` |
+| `GET` | `/admin/refunds` | 后台权限 | `{page, pageSize, status, from, to}` | `—` | `Page<Refund>` |
+| `POST` | `/admin/refunds/{id}/review` | 后台权限 | `—` | `ReviewDecision` | `Refund` |
+| `POST` | `/admin/refunds/{id}/retry` | 后台权限 | `—` | `Reason` | `Refund` |
+| `GET` | `/admin/finance/summary` | 后台权限 | `{from, to}` | `—` | `FinanceSummary` |
+| `POST` | `/admin/exports` | 后台权限 | `—` | `{kind, from, to}` | `Job` |
+| `GET` | `/admin/jobs/{id}` | 后台权限 | `—` | `—` | `Job` |
+| `GET` | `/admin/reconciliations` | 后台权限 | `{page, pageSize, from, to}` | `—` | `Page<Reconciliation>` |
+| `POST` | `/admin/reconciliations` | 后台权限 | `—` | `{date}` | `Reconciliation` |
+| `GET` | `/admin/metrics` | 后台权限 | `MetricQuery` | `—` | `Metrics` |
+| `GET` | `/admin/permissions` | 后台权限 | `—` | `—` | `Permission[]` |
+| `GET` | `/admin/roles` | 后台权限 | `—` | `—` | `Role[]` |
+| `POST` | `/admin/roles` | 后台权限 | `—` | `RoleInput` | `Role` |
+| `PUT` | `/admin/roles/{id}` | 后台权限 | `—` | `{name, permissions, dataScope, version}` | `Role` |
+| `DELETE` | `/admin/roles/{id}` | 后台权限 | `—` | `—` | `OK` |
+| `GET` | `/admin/accounts` | 后台权限 | `PageQuery` | `—` | `Page<AdminAccount>` |
+| `POST` | `/admin/accounts` | 后台权限 | `—` | `{username, displayName, roleIds, teacherId, enabled, initialPassword}` | `AdminAccount` |
+| `PUT` | `/admin/accounts/{id}` | 后台权限 | `—` | `{username, displayName, roleIds, teacherId, enabled, version}` | `AdminAccount` |
+| `POST` | `/admin/accounts/{id}/reset-password` | 后台权限 | `—` | `{newPassword, reason}` | `OK` |
+| `GET` | `/admin/audit-logs` | 后台权限 | `{page, pageSize, from, to, operatorId, action}` | `—` | `Page<AuditLog>` |
+| `GET` | `/admin/content/courses` | 后台权限 | `AdminContentQuery` | `—` | `Page<Course&{coverAssetId:string;}>` |
+| `GET` | `/admin/content/lessons` | 后台权限 | `AdminContentQuery` | `—` | `Page<Lesson&{assetId:string;}>` |
+| `GET` | `/admin/content/meditations` | 后台权限 | `AdminContentQuery` | `—` | `Page<Meditation&{coverAssetId:string;assetId:string;}>` |
+| `GET` | `/admin/content/noises` | 后台权限 | `AdminContentQuery` | `—` | `Page<Noise&{coverAssetId:string;assetId:string;}>` |
+| `GET` | `/admin/content/categories` | 后台权限 | `AdminContentQuery` | `—` | `Page<Category>` |
+| `GET` | `/admin/content/teachers` | 后台权限 | `AdminContentQuery` | `—` | `Page<Teacher&{avatarAssetId:string|null;userId:string|null;}>` |
+| `GET` | `/admin/content/membership-plans` | 后台权限 | `AdminContentQuery` | `—` | `Page<MembershipPlan>` |
+| `GET` | `/admin/content/mix-presets` | 后台权限 | `AdminContentQuery` | `—` | `Page<MixPreset>` |
+| `GET` | `/admin/content/reward-rules` | 后台权限 | `AdminContentQuery` | `—` | `Page<RewardRule&{coverAssetId:string;}>` |
+| `GET` | `/admin/content/notices` | 后台权限 | `AdminContentQuery` | `—` | `Page<AdminNotice>` |
+| `GET` | `/admin/content/courses/{id}` | 后台权限 | `—` | `—` | `{title, summary, description, coverUrl, categoryId, teacherId, difficulty, totalSeconds, lessonCount, priceFen, originalPriceFen, accessPolicy, access, favorite, liked, likeCount, learnerCount, progressPercent, status, id, version, createdAt, updatedAt, coverAssetId}` |
+| `GET` | `/admin/content/lessons/{id}` | 后台权限 | `—` | `—` | `{courseId, title, sort, durationSeconds, mediaKind, trialSeconds, access, resumeSeconds, completed, status, id, version, createdAt, updatedAt, assetId}` |
+| `GET` | `/admin/content/meditations/{id}` | 后台权限 | `—` | `—` | `{title, summary, coverUrl, categoryId, teacherId, durationSeconds, accessPolicy, access, favorite, status, id, version, createdAt, updatedAt, coverAssetId, assetId}` |
+| `GET` | `/admin/content/noises/{id}` | 后台权限 | `—` | `—` | `{title, coverUrl, categoryId, durationSeconds, accessPolicy, access, status, id, version, createdAt, updatedAt, coverAssetId, assetId}` |
+| `GET` | `/admin/content/categories/{id}` | 后台权限 | `—` | `—` | `Category` |
+| `GET` | `/admin/content/teachers/{id}` | 后台权限 | `—` | `—` | `{name, avatarUrl, bio, credentials, followed, status, id, version, createdAt, updatedAt, avatarAssetId, userId}` |
+| `GET` | `/admin/content/membership-plans/{id}` | 后台权限 | `—` | `—` | `MembershipPlan` |
+| `GET` | `/admin/content/mix-presets/{id}` | 后台权限 | `—` | `—` | `MixPreset` |
+| `GET` | `/admin/content/reward-rules/{id}` | 后台权限 | `—` | `—` | `{name, trigger, requiredDays, kind, courseId, physicalName, coverUrl, stockRemaining, startAt, endAt, perUserLimit, requiresReview, status, id, version, createdAt, updatedAt, coverAssetId}` |
+| `GET` | `/admin/content/notices/{id}` | 后台权限 | `—` | `—` | `AdminNotice` |
+| `POST` | `/admin/content/courses` | 后台权限 | `—` | `AdminCourseInput` | `{title, summary, description, coverUrl, categoryId, teacherId, difficulty, totalSeconds, lessonCount, priceFen, originalPriceFen, accessPolicy, access, favorite, liked, likeCount, learnerCount, progressPercent, status, id, version, createdAt, updatedAt, coverAssetId}` |
+| `POST` | `/admin/content/lessons` | 后台权限 | `—` | `AdminLessonInput` | `{courseId, title, sort, durationSeconds, mediaKind, trialSeconds, access, resumeSeconds, completed, status, id, version, createdAt, updatedAt, assetId}` |
+| `POST` | `/admin/content/meditations` | 后台权限 | `—` | `AdminMeditationInput` | `{title, summary, coverUrl, categoryId, teacherId, durationSeconds, accessPolicy, access, favorite, status, id, version, createdAt, updatedAt, coverAssetId, assetId}` |
+| `POST` | `/admin/content/noises` | 后台权限 | `—` | `AdminNoiseInput` | `{title, coverUrl, categoryId, durationSeconds, accessPolicy, access, status, id, version, createdAt, updatedAt, coverAssetId, assetId}` |
+| `POST` | `/admin/content/categories` | 后台权限 | `—` | `AdminCategoryInput` | `Category` |
+| `POST` | `/admin/content/teachers` | 后台权限 | `—` | `AdminTeacherInput` | `{name, avatarUrl, bio, credentials, followed, status, id, version, createdAt, updatedAt, avatarAssetId, userId}` |
+| `POST` | `/admin/content/membership-plans` | 后台权限 | `—` | `AdminPlanInput` | `MembershipPlan` |
+| `POST` | `/admin/content/mix-presets` | 后台权限 | `—` | `AdminMixInput` | `MixPreset` |
+| `POST` | `/admin/content/reward-rules` | 后台权限 | `—` | `AdminRewardInput` | `{name, trigger, requiredDays, kind, courseId, physicalName, coverUrl, stockRemaining, startAt, endAt, perUserLimit, requiresReview, status, id, version, createdAt, updatedAt, coverAssetId}` |
+| `POST` | `/admin/content/notices` | 后台权限 | `—` | `AdminNoticeInput` | `AdminNotice` |
+| `PUT` | `/admin/content/courses/{id}` | 后台权限 | `—` | `{title, summary, description, coverAssetId, categoryId, teacherId, difficulty, priceFen, originalPriceFen, accessPolicy, status, version}` | `{title, summary, description, coverUrl, categoryId, teacherId, difficulty, totalSeconds, lessonCount, priceFen, originalPriceFen, accessPolicy, access, favorite, liked, likeCount, learnerCount, progressPercent, status, id, version, createdAt, updatedAt, coverAssetId}` |
+| `PUT` | `/admin/content/lessons/{id}` | 后台权限 | `—` | `{courseId, title, sort, assetId, trialSeconds, status, version}` | `{courseId, title, sort, durationSeconds, mediaKind, trialSeconds, access, resumeSeconds, completed, status, id, version, createdAt, updatedAt, assetId}` |
+| `PUT` | `/admin/content/meditations/{id}` | 后台权限 | `—` | `{title, summary, coverAssetId, categoryId, teacherId, assetId, accessPolicy, status, version}` | `{title, summary, coverUrl, categoryId, teacherId, durationSeconds, accessPolicy, access, favorite, status, id, version, createdAt, updatedAt, coverAssetId, assetId}` |
+| `PUT` | `/admin/content/noises/{id}` | 后台权限 | `—` | `{title, coverAssetId, categoryId, assetId, accessPolicy, status, version}` | `{title, coverUrl, categoryId, durationSeconds, accessPolicy, access, status, id, version, createdAt, updatedAt, coverAssetId, assetId}` |
+| `PUT` | `/admin/content/categories/{id}` | 后台权限 | `—` | `{name, kind, sort, status, version}` | `Category` |
+| `PUT` | `/admin/content/teachers/{id}` | 后台权限 | `—` | `{name, avatarAssetId, bio, credentials, userId, status, version}` | `{name, avatarUrl, bio, credentials, followed, status, id, version, createdAt, updatedAt, avatarAssetId, userId}` |
+| `PUT` | `/admin/content/membership-plans/{id}` | 后台权限 | `—` | `{name, period, durationDays, priceFen, originalPriceFen, benefits, status, version}` | `MembershipPlan` |
+| `PUT` | `/admin/content/mix-presets/{id}` | 后台权限 | `—` | `{title, tracks, status, version}` | `MixPreset` |
+| `PUT` | `/admin/content/reward-rules/{id}` | 后台权限 | `—` | `{name, trigger, requiredDays, kind, courseId, physicalName, coverAssetId, stock, startAt, endAt, perUserLimit, requiresReview, status, version}` | `{name, trigger, requiredDays, kind, courseId, physicalName, coverUrl, stockRemaining, startAt, endAt, perUserLimit, requiresReview, status, id, version, createdAt, updatedAt, coverAssetId}` |
+| `PUT` | `/admin/content/notices/{id}` | 后台权限 | `—` | `{title, content, publishedAt, status, version}` | `AdminNotice` |
+| `DELETE` | `/admin/content/courses/{id}` | 后台权限 | `—` | `VersionReason` | `OK` |
+| `DELETE` | `/admin/content/lessons/{id}` | 后台权限 | `—` | `VersionReason` | `OK` |
+| `DELETE` | `/admin/content/meditations/{id}` | 后台权限 | `—` | `VersionReason` | `OK` |
+| `DELETE` | `/admin/content/noises/{id}` | 后台权限 | `—` | `VersionReason` | `OK` |
+| `DELETE` | `/admin/content/categories/{id}` | 后台权限 | `—` | `VersionReason` | `OK` |
+| `DELETE` | `/admin/content/teachers/{id}` | 后台权限 | `—` | `VersionReason` | `OK` |
+| `DELETE` | `/admin/content/membership-plans/{id}` | 后台权限 | `—` | `VersionReason` | `OK` |
+| `DELETE` | `/admin/content/mix-presets/{id}` | 后台权限 | `—` | `VersionReason` | `OK` |
+| `DELETE` | `/admin/content/reward-rules/{id}` | 后台权限 | `—` | `VersionReason` | `OK` |
+| `DELETE` | `/admin/content/notices/{id}` | 后台权限 | `—` | `VersionReason` | `OK` |
 
 ### 11.2 数据字段、枚举与状态完整定义
 
 ```typescript
-// 澄心涧 API contract 0.1.0; all dates ISO-8601, all IDs strings, money in fen.
+// 澄心涧 API contract 0.2.0; all dates ISO-8601, all IDs strings, money in fen.
 export type ID = string;
 export type DateTime = string;
 export type DateOnly = string;
@@ -639,7 +641,8 @@ export interface SmsProof { challengeId: ID; code: string }
 export interface Reauth extends SmsProof { purpose: 'change_phone' | 'change_password' | 'delete_account' }
 export interface ReauthResult { reauthToken: string; expiresIn: number }
 export interface Deletion { id: ID; status: 'pending' | 'cancelled' | 'completed' | 'blocked'; requestedAt: DateTime; effectiveAt: DateTime | null; blockers: string[] }
-export interface Settings { theme: Theme; backgroundAudio: boolean; defaultSpeed: number; autoNext: boolean; endBellAssetId: ID | null; practiceReminderEnabled: boolean; practiceReminderTime: string | null; liveReminderEnabled: boolean; membershipReminderEnabled: boolean }
+// version is returned by the server; send it on PUT for optimistic locking. Omission retains v0.1 compatibility.
+export interface Settings { version?: number; theme: Theme; backgroundAudio: boolean; defaultSpeed: number; autoNext: boolean; endBellAssetId: ID | null; practiceReminderEnabled: boolean; practiceReminderTime: string | null; liveReminderEnabled: boolean; membershipReminderEnabled: boolean }
 export interface Notice { id: ID; title: string; content: string; publishedAt: DateTime; read: boolean }
 export interface Category extends Versioned { name: string; kind: 'course' | 'meditation' | 'noise'; sort: number; status: PublishStatus }
 export interface Teacher extends Versioned { name: string; avatarUrl: string | null; bio: string; credentials: string[]; followed: boolean; status: PublishStatus }
@@ -692,7 +695,8 @@ export interface RewardClaim extends Versioned { ruleId: ID; ruleVersion: number
 export interface Submission extends Versioned { assetId: ID; practiceSessionId: ID; text: string; status: ReviewStatus; reviewReason: string | null; rewardClaimIds: ID[] }
 export interface Asset extends Versioned { purpose: 'avatar' | 'cover' | 'course_media' | 'meditation_media' | 'noise_media' | 'practice_recording'; filename: string; mimeType: string; sizeBytes: number; durationSeconds: number | null; status: 'uploading' | 'processing' | 'ready' | 'rejected'; publicUrl: string | null }
 export interface UploadRequest { purpose: Asset['purpose']; filename: string; mimeType: string; sizeBytes: number; sha256: string }
-export interface UploadTicket { assetId: ID; uploadUrl: string; method: 'POST'; formData: { key: string; policy: string; signature: string; credential: string; securityToken: string }; fileField: 'file'; expiresAt: DateTime; maxSizeBytes: number }
+// Submit every returned formData entry verbatim; never rename provider signature fields.
+export interface UploadTicket { assetId: ID; uploadUrl: string; method: 'POST'; formData: Record<string, string>; fileField: 'file'; expiresAt: DateTime; maxSizeBytes: number }
 export interface Job extends Versioned { kind: 'export' | 'transcode' | 'replay_to_course' | 'account_export'; status: 'queued' | 'running' | 'succeeded' | 'failed'; progress: number; resultUrl: string | null; resultId: ID | null; expiresAt: DateTime | null; errorCode: string | null }
 export interface AdminProfile { id: ID; username: string; displayName: string; roleIds: ID[]; permissions: string[]; dataScope: 'all' | 'own_content'; teacherId: ID | null }
 export interface AdminLogin { username: string; password: string; captchaTicket: string; otp?: string }
@@ -962,4 +966,4 @@ export interface ErrorEnvelope { code: string; message: string; data: null; requ
 
 修改 `contracts/` 后，在本目录执行 `npm ci`、`npm run check`；它会检查类型、生成 JSON Schema、更新 OpenAPI 与本 README 附录。需要 Node.js 和 Python。不要只改生成的 README 附录。破坏性变更必须双方共同确认、升契约版本并同步前后端；新增可选字段一般可保持 `/v1`。
 
-本交付只做契约结构检查，不代表支付、直播、备案或真机测试通过；这些需甲方真实账号与开发实现后验证。
+契约检查只验证结构；已实现后端与测试范围见 `docs/backend-development.md`。支付、直播、备案或真机测试仍需甲方真实账号与对应开发实现后验证。

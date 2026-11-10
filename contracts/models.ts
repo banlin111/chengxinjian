@@ -1,4 +1,4 @@
-// 澄心涧 API contract 0.1.0; all dates ISO-8601, all IDs strings, money in fen.
+// 澄心涧 API contract 0.2.0; all dates ISO-8601, all IDs strings, money in fen.
 export type ID = string;
 export type DateTime = string;
 export type DateOnly = string;
@@ -33,7 +33,8 @@ export interface SmsProof { challengeId: ID; code: string }
 export interface Reauth extends SmsProof { purpose: 'change_phone' | 'change_password' | 'delete_account' }
 export interface ReauthResult { reauthToken: string; expiresIn: number }
 export interface Deletion { id: ID; status: 'pending' | 'cancelled' | 'completed' | 'blocked'; requestedAt: DateTime; effectiveAt: DateTime | null; blockers: string[] }
-export interface Settings { theme: Theme; backgroundAudio: boolean; defaultSpeed: number; autoNext: boolean; endBellAssetId: ID | null; practiceReminderEnabled: boolean; practiceReminderTime: string | null; liveReminderEnabled: boolean; membershipReminderEnabled: boolean }
+// version is returned by the server; send it on PUT for optimistic locking. Omission retains v0.1 compatibility.
+export interface Settings { version?: number; theme: Theme; backgroundAudio: boolean; defaultSpeed: number; autoNext: boolean; endBellAssetId: ID | null; practiceReminderEnabled: boolean; practiceReminderTime: string | null; liveReminderEnabled: boolean; membershipReminderEnabled: boolean }
 export interface Notice { id: ID; title: string; content: string; publishedAt: DateTime; read: boolean }
 export interface Category extends Versioned { name: string; kind: 'course' | 'meditation' | 'noise'; sort: number; status: PublishStatus }
 export interface Teacher extends Versioned { name: string; avatarUrl: string | null; bio: string; credentials: string[]; followed: boolean; status: PublishStatus }
@@ -86,7 +87,8 @@ export interface RewardClaim extends Versioned { ruleId: ID; ruleVersion: number
 export interface Submission extends Versioned { assetId: ID; practiceSessionId: ID; text: string; status: ReviewStatus; reviewReason: string | null; rewardClaimIds: ID[] }
 export interface Asset extends Versioned { purpose: 'avatar' | 'cover' | 'course_media' | 'meditation_media' | 'noise_media' | 'practice_recording'; filename: string; mimeType: string; sizeBytes: number; durationSeconds: number | null; status: 'uploading' | 'processing' | 'ready' | 'rejected'; publicUrl: string | null }
 export interface UploadRequest { purpose: Asset['purpose']; filename: string; mimeType: string; sizeBytes: number; sha256: string }
-export interface UploadTicket { assetId: ID; uploadUrl: string; method: 'POST'; formData: { key: string; policy: string; signature: string; credential: string; securityToken: string }; fileField: 'file'; expiresAt: DateTime; maxSizeBytes: number }
+// Submit every returned formData entry verbatim; never rename provider signature fields.
+export interface UploadTicket { assetId: ID; uploadUrl: string; method: 'POST'; formData: Record<string, string>; fileField: 'file'; expiresAt: DateTime; maxSizeBytes: number }
 export interface Job extends Versioned { kind: 'export' | 'transcode' | 'replay_to_course' | 'account_export'; status: 'queued' | 'running' | 'succeeded' | 'failed'; progress: number; resultUrl: string | null; resultId: ID | null; expiresAt: DateTime | null; errorCode: string | null }
 export interface AdminProfile { id: ID; username: string; displayName: string; roleIds: ID[]; permissions: string[]; dataScope: 'all' | 'own_content'; teacherId: ID | null }
 export interface AdminLogin { username: string; password: string; captchaTicket: string; otp?: string }

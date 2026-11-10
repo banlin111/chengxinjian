@@ -1,0 +1,69 @@
+spring:
+  application:
+    name: chengxinjian-server
+  datasource:
+    url: ${DB_URL}
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
+  jackson:
+    parser:
+      strict-duplicate-detection: true
+    mapper:
+      allow-coercion-of-scalars: false
+    deserialization:
+      fail-on-unknown-properties: true
+      fail-on-trailing-tokens: true
+      accept-float-as-int: false
+    time-zone: UTC
+  flyway:
+    enabled: true
+    clean-disabled: true
+  mvc:
+    problemdetails:
+      enabled: false
+server:
+  port: ${SERVER_PORT:8080}
+  error:
+    include-message: never
+    include-stacktrace: never
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      show-details: never
+      probes:
+        enabled: true
+logging:
+  level:
+    com.qcloud.cos: 'OFF'
+    com.tencentcloudapi: 'OFF'
+    org.apache.http.wire: 'OFF'
+    org.apache.http.headers: 'OFF'
+  pattern:
+    level: '%5p [requestId:%X{requestId:-}]'
+app:
+  auth:
+    access-ttl: PT2H
+    refresh-ttl: P30D
+    captcha-mode: unavailable
+    local-captcha-ticket: ''
+    bootstrap-username: ''
+    bootstrap-password: ''
+    allowed-origins: ${ADMIN_ALLOWED_ORIGINS:}
+  wechat:
+    app-id: ${WX_APP_ID:}
+    app-secret: ${WX_APP_SECRET:}
+  media:
+    provider: ${CLOUD_PROVIDER:tencent}
+    bucket: ${STORAGE_BUCKET:}
+    region: ${STORAGE_REGION:}
+    secret-id: ${CLOUD_SECRET_ID:}
+    secret-key: ${CLOUD_SECRET_KEY:}
+    ffmpeg-path: ${FFMPEG_PATH:}
+    max-media-bytes: ${MEDIA_MAX_BYTES:536870912}
+    max-duration-seconds: ${MEDIA_MAX_SECONDS:14400}
+    decode-timeout-seconds: ${MEDIA_DECODE_TIMEOUT_SECONDS:120}
+    worker-enabled: ${MEDIA_WORKER_ENABLED:true}

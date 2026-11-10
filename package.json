@@ -1,11 +1,11 @@
 {
   "name": "chengxinjian-contracts",
   "private": true,
-  "version": "0.1.0",
-  "description": "Documentation and API contracts only; not the application implementation",
+  "version": "0.2.0",
+  "description": "Shared API contracts and documentation tooling; Java backend lives in server/",
   "scripts": {
     "typecheck": "tsc --noEmit",
-    "schema": "node -e \"require('fs').mkdirSync('research',{recursive:true})\" && typescript-json-schema tsconfig.json Api --required --noExtraProps --out research/api-schema.json",
+    "schema": "node scripts/generate_schema.cjs",
     "docs": "python scripts/build_docs.py",
     "check": "npm run typecheck && npm run schema && npm run docs"
   },
