@@ -40,6 +40,7 @@ class BackendIntegrationTest {
     @Autowired ObjectMapper json;
     @Autowired JdbcTemplate jdbc;
     @BeforeEach void reset() {
+        CourseFixtures.clear(jdbc);
         jdbc.update("DELETE FROM idempotency_record");
         jdbc.update("DELETE FROM content_category");
         jdbc.update("DELETE FROM auth_session");

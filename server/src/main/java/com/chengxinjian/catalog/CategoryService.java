@@ -86,7 +86,9 @@ public class CategoryService {
     @Transactional
     public Category update(AdminPrincipal admin, String id, Update input) {
         requireGlobalScope(admin);
-        find(id);
+        var row=jdbc.query("SELECT * FROM content_category WHERE id=? FOR UPDATE", MAPPER,id).stream().findFirst().orElseThrow(BusinessException::notFound);
+        if (row.version()!=input.version()) throw versionConflict();
+        checkCourses(id,!row.kind().equals(input.kind()),input.status());
         int changed = jdbc.update("""
             UPDATE content_category SET name=?,kind=?,sort_order=?,status=?,version=version+1,updated_at=? WHERE id=? AND version=?
             """, input.name(), input.kind(), input.sort(), input.status(), Timestamp.from(clock.instant()), id, input.version());
@@ -102,9 +104,16 @@ public class CategoryService {
         Category current = rows.getFirst();
         if (current.status().equals("archived")) { return; }
         if (current.version() != input.version()) { throw versionConflict(); }
+        checkCourses(id,false,"archived");
         jdbc.update("UPDATE content_category SET status='archived',version=version+1,updated_at=? WHERE id=?",
             Timestamp.from(clock.instant()), id);
         audit.record(admin.id(), "content.category.archive", id, input.reason());
+    }
+    private void checkCourses(String id,boolean typeChanged,String status) {
+        if (!typeChanged && "published".equals(status)) return;
+        String active=typeChanged ? "" : ("archived".equals(status) ? " AND status<>'archived'" : " AND status='published'");
+        if (jdbc.queryForObject("SELECT COUNT(*) FROM content_course WHERE category_id=?"+active,Long.class,id)>0)
+            throw new BusinessException(HttpStatus.CONFLICT,"CONTENT_IN_USE","请先调整引用此分类的课程");
     }
     private void requireGlobalScope(AdminPrincipal admin) {
         if (admin == null || !"all".equals(admin.dataScope())) { throw BusinessException.forbidden(); }

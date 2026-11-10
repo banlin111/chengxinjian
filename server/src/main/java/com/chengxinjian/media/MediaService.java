@@ -28,7 +28,7 @@ public class MediaService {
     private final MediaProperties properties;
     private final TransactionTemplate tx;
     private final RowMapper<Asset> mapper=(r,n)->new Asset(r.getString("id"),r.getString("purpose"),r.getString("filename"),r.getString("mime_type"),
-        r.getLong("size_bytes"),(Integer)r.getObject("duration_seconds"),r.getString("status"),r.getString("public_url"),r.getInt("version"),
+        r.getLong("size_bytes"),(Integer)r.getObject("duration_seconds"),r.getString("status"),"approved".equals(r.getString("review_status")) ? r.getString("public_url") : null,r.getInt("version"),
         r.getTimestamp("created_at").toInstant(),r.getTimestamp("updated_at").toInstant());
     public MediaService(JdbcTemplate jdbc,ObjectMapper json,Clock clock,AuditService audit,MediaStorage storage,MediaProperties properties,PlatformTransactionManager manager) {
         this.jdbc=jdbc;this.json=json;this.clock=clock;this.audit=audit;this.storage=storage;this.properties=properties;
@@ -49,6 +49,8 @@ public class MediaService {
                 "SELECT COUNT(*) FROM content_teacher WHERE id=? AND status<>'archived'",Long.class,admin.teacherId())!=1) throw BusinessException.forbidden();
         }
     }
+    Asset lockEditorial(AdminPrincipal admin,String id) { own(actor(admin),row(id,true),true); return find(id); }
+    void requireEditorialScope(AdminPrincipal admin) { permission(actor(admin),false); }
     private void own(Actor actor,Map<String,Object> row,boolean write) {
         permission(actor,write);
         if (actor.admin()==null) {

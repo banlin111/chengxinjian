@@ -81,7 +81,7 @@ function check(type, s, label, depth = 0) {
   checked++;
 }
 for (const op of checker.getPropertiesOfType(api)) check(typeOf(op), schema.properties[op.name], op.name);
-assert.equal(Object.keys(schema.properties).length, 220, 'Operation count changed: review contract scope');
+assert.equal(Object.keys(schema.properties).length, 224, 'Operation count changed: review contract scope');
 fs.mkdirSync(path.join(root, 'research'), { recursive: true });
 fs.writeFileSync(path.join(root, 'research/api-schema.json'), JSON.stringify(schema, null, 2) + '\n');
-console.log(`Checked ${checked} object shapes across all 220 operations against TypeScript`);
+console.log(`Checked ${checked} object shapes across all 224 operations against TypeScript`);

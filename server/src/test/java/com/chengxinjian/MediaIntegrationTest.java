@@ -48,6 +48,7 @@ class MediaIntegrationTest {
     @MockitoSpyBean AuditService audit;
     byte[] png;
     @BeforeEach void reset() throws Exception {
+        CourseFixtures.clear(jdbc);
         jdbc.update("UPDATE admin_account SET teacher_id=NULL,enabled=TRUE,data_scope='all'");
         for(String table:List.of("media_processing_job","media_upload_request","teacher_follow","content_teacher","media_asset","user_agreement_consent","user_auth_session","wechat_identity","user_settings","app_user","idempotency_record","login_throttle","audit_log","auth_session")) jdbc.update("DELETE FROM "+table);
         jdbc.update("DELETE FROM admin_role_permission WHERE role_id='role-content-manager'");
@@ -83,6 +84,21 @@ class MediaIntegrationTest {
         verify(storage).put(eq("validated/"+id+"/source"),any(),eq("image/png"));
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM audit_log WHERE action='media.validation.ready'",Long.class)).isEqualTo(1);
     }
+    @Test void failedJobHasScopedManagementAndAuditedIdempotentRetry() throws Exception {
+        String token=admin(),id=create(token); complete(token,id,UUID.randomUUID().toString(),200);
+        jdbc.update("UPDATE media_processing_job SET attempts=5,state='failed',last_error='MEDIA_PROVIDER_UNAVAILABLE' WHERE asset_id=?",id);
+        var list=send(as(get("/api/v1/admin/assets/processing-failures"),token),null,200);
+        assertThat(list.at("/data/items/0/errorCode").asText()).isEqualTo("MEDIA_PROVIDER_UNAVAILABLE");
+        var req=as(post("/api/v1/admin/assets/"+id+"/processing/retry").header("Idempotency-Key",UUID.randomUUID().toString()),token);
+        var body=Map.of("reason","供应商已恢复"); var first=send(req,body,200);
+        assertThat(send(req,body,200).get("data")).isEqualTo(first.get("data"));
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM audit_log WHERE action='media.processing.retry'",Long.class)).isEqualTo(1);
+        assertThat(worker.runOnce()).isTrue();
+        assertThat(send(as(get("/api/v1/admin/assets/"+id+"/processing"),token),null,200).at("/data/jobState").asText()).isEqualTo("done");
+        var privateAsset=ticket(user(),UUID.randomUUID().toString(),input("avatar"),200).at("/data/assetId").asText();
+        send(as(get("/api/v1/admin/assets/"+privateAsset+"/processing"),token),null,403);
+    }
+
     @Test void ticketReplaysOriginalSnapshotAndRejectsChangedRequest() throws Exception {
         String token=admin(),key=UUID.randomUUID().toString();var body=input("avatar");var first=ticket(token,key,body,200);
         assertThat(ticket(token,key,body,200).get("data")).isEqualTo(first.get("data"));

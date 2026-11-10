@@ -13,3 +13,5 @@ app:
     local-captcha-ticket: ${LOCAL_CAPTCHA_TICKET:}
     bootstrap-username: ${LOCAL_ADMIN_USERNAME:admin}
     bootstrap-password: ${LOCAL_ADMIN_PASSWORD:}
+  media:
+    public-origin: ${MEDIA_PUBLIC_ORIGIN:http://127.0.0.1:${server.port}}

@@ -26,7 +26,7 @@ import static com.chengxinjian.catalog.CategoryModels.Page;
 public class TeacherService {
     private static final String SELECT="""
         SELECT t.*,a.public_url AS avatar_url FROM content_teacher t
-        LEFT JOIN media_asset a ON a.id=t.avatar_asset_id AND a.status='ready' AND a.purpose='avatar'
+        LEFT JOIN media_asset a ON a.id=t.avatar_asset_id AND a.status='ready' AND a.purpose='avatar' AND a.review_status='approved'
         """;
     private final JdbcTemplate jdbc;
     private final ObjectMapper json;
@@ -103,6 +103,7 @@ public class TeacherService {
         requireScope(admin,id);var current=find(id,true);
         if (current.version()!=update.version()) { throw conflict("VERSION_CONFLICT","讲师资料已修改，请重新读取"); }
         if (!"all".equals(admin.dataScope()) && !Objects.equals(current.userId(),update.userId())) { throw BusinessException.forbidden(); }
+        checkCourses(id,update.status());
         validateReferences(admin,update.input(),id);
         try { jdbc.update("UPDATE content_teacher SET name=?,bio=?,credentials_json=?,avatar_asset_id=?,user_id=?,status=?,version=version+1,updated_at=? WHERE id=? AND version=?",
             update.name(),update.bio(),encode(update.credentials()),update.avatarAssetId(),update.userId(),update.status(),Timestamp.from(clock.instant()),id,update.version()); }
@@ -114,6 +115,7 @@ public class TeacherService {
         requireScope(admin,id);var current=find(id,true);
         if ("archived".equals(current.status())) { return; }
         if (current.version()!=input.version()) { throw conflict("VERSION_CONFLICT","讲师资料已修改，请重新读取"); }
+        checkCourses(id,"archived");
         jdbc.update("UPDATE content_teacher SET status='archived',version=version+1,updated_at=? WHERE id=?",Timestamp.from(clock.instant()),id);
         audit.record(admin.id(),"content.teacher.archive",id,input.reason());
     }
@@ -138,7 +140,7 @@ public class TeacherService {
             var rows=jdbc.queryForList("SELECT * FROM media_asset WHERE id=?",input.avatarAssetId());
             if (rows.isEmpty()) { throw BusinessException.invalid("头像资产不存在"); }
             var asset=rows.getFirst();
-            if (!"avatar".equals(asset.get("purpose")) || !"ready".equals(asset.get("status")) || asset.get("public_url")==null) {
+            if (!"avatar".equals(asset.get("purpose")) || !"ready".equals(asset.get("status")) || !"approved".equals(asset.get("review_status")) || asset.get("public_url")==null) {
                 throw conflict("ASSET_NOT_READY","头像须为已处理完成的头像图片");
             }
             if (!List.of("image/jpeg","image/png","image/webp").contains(asset.get("mime_type"))) { throw BusinessException.invalid("头像图片类型不支持"); }
@@ -150,9 +152,16 @@ public class TeacherService {
             if (((Number)asset.get("size_bytes")).longValue()>10*1024*1024) { throw BusinessException.invalid("头像图片超过大小限制"); }
             try {
                 var url=java.net.URI.create((String)asset.get("public_url"));
-                if (!"https".equals(url.getScheme()) || url.getHost()==null || url.getUserInfo()!=null) { throw BusinessException.invalid("头像地址不可用"); }
+                boolean reviewedLocal="approved".equals(asset.get("review_status")) && "http".equals(url.getScheme()) && "127.0.0.1".equals(url.getHost()) && ("/media/images/"+input.avatarAssetId()).equals(url.getPath());
+                if ((!reviewedLocal && !"https".equals(url.getScheme())) || url.getHost()==null || url.getUserInfo()!=null) { throw BusinessException.invalid("头像地址不可用"); }
             } catch (IllegalArgumentException e) { throw BusinessException.invalid("头像地址不可用"); }
         }
+    }
+    private void checkCourses(String id,String status) {
+        if ("published".equals(status)) return;
+        String active="archived".equals(status) ? " AND status<>'archived'" : " AND status='published'";
+        if(jdbc.queryForObject("SELECT COUNT(*) FROM content_course WHERE teacher_id=?"+active,Long.class,id)>0)
+            throw conflict("CONTENT_IN_USE","请先调整此讲师的课程");
     }
     private void requireScope(AdminPrincipal admin,String id) {
         if (admin==null || !("all".equals(admin.dataScope()) || ("own_content".equals(admin.dataScope()) && id.equals(admin.teacherId())))) { throw BusinessException.forbidden(); }

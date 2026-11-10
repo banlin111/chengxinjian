@@ -1,12 +1,12 @@
 # 澄心涧：微信小程序与管理后台协作 README
 
-版本：0.2.0（开发契约草案）｜上传契约共同确认：2026-11-10｜两人开发
+版本：0.3.0（开发契约草案）｜上传契约共同确认：2026-11-10｜两人开发
 
 **本期范围：实现《澄心涧.pdf》思维导图的全部业务功能，先交付微信小程序及 Web 管理后台；后端采用 Java / Spring Boot，三份原型的配色都保留为可切换主题。APP 排在后续阶段。**
 
 本文定义目标方案与接口，不代表应用已开发完成。尚无甲方答案的业务数字均需确认，原型中的价格、用户量、奖励及文案不能作为正式配置。本文、接口类型和 OpenAPI 均为同一版本的草案，双方确认后冻结。
 
-**后端已开始实施：** `server/` 已包含工程基础、管理员会话、课程分类、微信用户身份/会话、协议与设置、讲师管理与关注，以及私有媒资上传、校验及后台预览（29 个业务接口）。已实现范围、启动方法、测试及后续工作见 [后端开发说明](docs/backend-development.md)。本文的完整接口附录仍是全量目标，不能视为所有接口均已实现。
+**后端当前覆盖 60 个契约方法与路径。** 已实现管理员和微信会话、分类、讲师、私有媒资、编辑审核、课程与课节、会员套餐和人工权益，以及课节播放授权、事件和恢复进度。当前契约包含 224 个方法与路径，其中播放本阶段仅支持 lesson。已验证的环境、素材和未验收项见[阶段五记录](docs/backend-stage5-2026-11-10.md)和[后端开发说明](docs/backend-development.md)。
 
 **协作接续：** 后端代码已推送至 `codex/backend-foundation`，见 [完整交接提示词](docs/handoff-prompt-2026-11-10.md) 和 [发布核验记录](docs/publish-2026-11-10.md)。本地测试、真实供应商/开发工具联调及 GitHub CI 通过的范围已分别记录；正式前端、公网环境、微信真机及整体上线验收仍待完成。
 
@@ -380,7 +380,7 @@ join 同时校验账号、会员、直播状态，返回短效播放 URL、一�
 
 ### 11.1 HTTP 接口索引
 
-共 **220 个方法/路径组合**，均加 `/api/v1` 前缀。以下类型名在后面的完整类型定义中展开；自动生成的类型别名以 OpenAPI 内定义为准。回调与 WebSocket 见第8节及 SocketEvent。
+共 **224 个方法/路径组合**，均加 `/api/v1` 前缀。以下类型名在后面的完整类型定义中展开；自动生成的类型别名以 OpenAPI 内定义为准。回调与 WebSocket 见第8节及 SocketEvent。
 
 | 方法 | 路径 | 身份 | 查询 | 请求体 | data 返回值 |
 | --- | --- | --- | --- | --- | --- |
@@ -526,6 +526,10 @@ join 同时校验账号、会员、直播状态，返回短效播放 URL、一�
 | `DELETE` | `/admin/comments/{id}` | 后台权限 | `—` | `Reason` | `OK` |
 | `GET` | `/admin/submissions` | 后台权限 | `ModerationQueueQuery` | `—` | `Page<Submission>` |
 | `POST` | `/admin/submissions/{id}/review` | 后台权限 | `—` | `ReviewDecision` | `Submission` |
+| `GET` | `/admin/assets/{id}/processing` | 后台权限 | `—` | `—` | `AssetProcessing` |
+| `POST` | `/admin/assets/{id}/processing/retry` | 后台权限 | `—` | `Reason` | `Asset` |
+| `GET` | `/admin/assets/processing-failures` | 后台权限 | `PageQuery` | `—` | `Page<AssetProcessing>` |
+| `PUT` | `/admin/assets/{id}/review` | 后台权限 | `—` | `ReviewDecision` | `AssetProcessing` |
 | `POST` | `/admin/assets/{id}/preview` | 后台权限 | `—` | `—` | `{url, expiresAt}` |
 | `GET` | `/admin/reports` | 后台权限 | `{page, pageSize, status}` | `—` | `Page<Report>` |
 | `POST` | `/admin/reports/{id}/resolve` | 后台权限 | `—` | `{version, reason, decision, action}` | `Report` |
@@ -608,7 +612,7 @@ join 同时校验账号、会员、直播状态，返回短效播放 URL、一�
 ### 11.2 数据字段、枚举与状态完整定义
 
 ```typescript
-// 澄心涧 API contract 0.2.0; all dates ISO-8601, all IDs strings, money in fen.
+// 澄心涧 API contract 0.3.0; all dates ISO-8601, all IDs strings, money in fen.
 export type ID = string;
 export type DateTime = string;
 export type DateOnly = string;
@@ -765,6 +769,8 @@ export type SocketEvent =
   | { type: 'access.revoked'; eventId: ID; reason: string }
   | { type: 'resync_required'; eventId: ID }
   | { type: 'error'; code: string; message: string };
+
+export interface AssetProcessing { assetId: ID; status: Asset['status']; reviewStatus: 'pending' | 'approved' | 'rejected'; jobState: 'pending' | 'running' | 'done' | 'failed' | null; attempts: number; errorCode: string | null; trials: { seconds: number; state: 'pending' | 'running' | 'ready' | 'failed'; attempts: number; errorCode: string | null }[] }
 ```
 
 ### 11.3 每个接口的请求与返回对应关系
@@ -922,6 +928,10 @@ export interface CoreApi {
   'DELETE /admin/comments/{id}': B<T.Reason, T.OK>;
   'GET /admin/submissions': Q<T.ModerationQueueQuery, T.Page<T.Submission>>;
   'POST /admin/submissions/{id}/review': B<T.ReviewDecision, T.Submission>;
+  'GET /admin/assets/{id}/processing': R<T.AssetProcessing>;
+  'POST /admin/assets/{id}/processing/retry': B<T.Reason, T.Asset>;
+  'GET /admin/assets/processing-failures': Q<T.PageQuery, T.Page<T.AssetProcessing>>;
+  'PUT /admin/assets/{id}/review': B<T.ReviewDecision, T.AssetProcessing>;
   'POST /admin/assets/{id}/preview': R<{ url: string; expiresAt: T.DateTime }>;
   'GET /admin/reports': Q<T.PageQuery & { status?: T.Report['status'] }, T.Page<T.Report>>;
   'POST /admin/reports/{id}/resolve': B<T.VersionReason & { decision: 'resolved' | 'rejected'; action: 'none' | 'delete_content' | 'ban_user' }, T.Report>;

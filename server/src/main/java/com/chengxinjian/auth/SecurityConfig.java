@@ -37,11 +37,12 @@ public class SecurityConfig {
             .sessionManagement(c -> c.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .requestCache(c -> c.disable()).formLogin(c -> c.disable()).httpBasic(c -> c.disable())
             .authorizeHttpRequests(c -> c
-                .requestMatchers(HttpMethod.GET, "/actuator/health", "/actuator/health/readiness", "/actuator/health/liveness", "/api/v1/categories", "/api/v1/agreements/*", "/api/v1/teachers", "/api/v1/teachers/*").permitAll()
+                .requestMatchers(HttpMethod.GET, "/actuator/health", "/actuator/health/readiness", "/actuator/health/liveness", "/api/v1/membership/plans", "/media/images/*", "/api/v1/courses", "/api/v1/courses/*", "/api/v1/courses/*/lessons", "/api/v1/categories", "/api/v1/agreements/*", "/api/v1/teachers", "/api/v1/teachers/*").permitAll()
                 .requestMatchers(HttpMethod.POST, "/api/v1/admin/auth/login", "/api/v1/admin/auth/refresh", "/api/v1/auth/wechat/login", "/api/v1/auth/refresh").permitAll()
                 .requestMatchers("/api/v1/admin/**").authenticated()
                 .requestMatchers(HttpMethod.POST,"/api/v1/uploads","/api/v1/uploads/*/complete").authenticated()
                 .requestMatchers(HttpMethod.GET,"/api/v1/assets/*").authenticated()
+                .requestMatchers("/api/v1/playbacks","/api/v1/playbacks/*/events","/api/v1/playbacks/*/renew").hasRole("USER")
                 .requestMatchers("/api/v1/me", "/api/v1/me/**", "/api/v1/auth/logout").hasRole("USER")
                 .anyRequest().denyAll())
             .exceptionHandling(c -> c

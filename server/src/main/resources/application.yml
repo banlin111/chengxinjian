@@ -57,6 +57,7 @@ app:
     app-id: ${WX_APP_ID:}
     app-secret: ${WX_APP_SECRET:}
   media:
+    public-origin: ${MEDIA_PUBLIC_ORIGIN:}
     provider: ${CLOUD_PROVIDER:tencent}
     bucket: ${STORAGE_BUCKET:}
     region: ${STORAGE_REGION:}

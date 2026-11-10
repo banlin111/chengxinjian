@@ -150,6 +150,10 @@ export interface CoreApi {
   'DELETE /admin/comments/{id}': B<T.Reason, T.OK>;
   'GET /admin/submissions': Q<T.ModerationQueueQuery, T.Page<T.Submission>>;
   'POST /admin/submissions/{id}/review': B<T.ReviewDecision, T.Submission>;
+  'GET /admin/assets/{id}/processing': R<T.AssetProcessing>;
+  'POST /admin/assets/{id}/processing/retry': B<T.Reason, T.Asset>;
+  'GET /admin/assets/processing-failures': Q<T.PageQuery, T.Page<T.AssetProcessing>>;
+  'PUT /admin/assets/{id}/review': B<T.ReviewDecision, T.AssetProcessing>;
   'POST /admin/assets/{id}/preview': R<{ url: string; expiresAt: T.DateTime }>;
   'GET /admin/reports': Q<T.PageQuery & { status?: T.Report['status'] }, T.Page<T.Report>>;
   'POST /admin/reports/{id}/resolve': B<T.VersionReason & { decision: 'resolved' | 'rejected'; action: 'none' | 'delete_content' | 'ban_user' }, T.Report>;

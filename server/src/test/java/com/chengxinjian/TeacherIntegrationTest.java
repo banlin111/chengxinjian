@@ -40,6 +40,7 @@ class TeacherIntegrationTest {
     @Autowired JdbcTemplate jdbc;
     @Autowired UserSessionService sessions;
     @BeforeEach void reset() {
+        CourseFixtures.clear(jdbc);
         jdbc.update("UPDATE admin_account SET teacher_id=NULL,enabled=TRUE,data_scope='all'");
         for (var table:List.of("media_processing_job","media_upload_request","teacher_follow","content_teacher","media_asset","user_agreement_consent","user_auth_session","wechat_identity","user_settings","app_user","wechat_code_use","login_throttle","audit_log","auth_session","idempotency_record")) { jdbc.update("DELETE FROM "+table); }
         jdbc.update("DELETE FROM admin_role_permission WHERE role_id='role-content-manager'");
@@ -71,7 +72,7 @@ class TeacherIntegrationTest {
     }
     private String avatar(String owner,String purpose,String status) {
         String id=UUID.randomUUID().toString();var now=Timestamp.from(Instant.now());
-        jdbc.update("INSERT INTO media_asset(id,purpose,filename,mime_type,size_bytes,sha256,object_key,status,owner_admin_id,public_url,created_at,updated_at) VALUES (?,?,?,'image/png',128,?,?,?,?,?,?,?)",
+        jdbc.update("INSERT INTO media_asset(id,purpose,filename,mime_type,size_bytes,sha256,object_key,status,owner_admin_id,public_url,created_at,updated_at,review_status) VALUES (?,?,?,'image/png',128,?,?,?,?,?,?,?,'approved')",
             id,purpose,"test.png","a".repeat(64),"test/"+id,status,owner,"https://assets.example.test/"+id,now,now);return id;
     }
     @Test void publicCatalogOnlyShowsPublishedTeachersAndNeverAccountOrAssetIdentifiers() throws Exception {

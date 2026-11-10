@@ -73,7 +73,7 @@ error = {'type':'object','required':['code','message','data','requestId','server
  'requestId':{'type':'string'}, 'serverTime':{'type':'string','format':'date-time'},
  'details':{'type':'array','items':{'type':'object','required':['field','reason'],'properties':{'field':{'type':'string'},'reason':{'type':'string'}}}}
 }}
-spec = {'openapi':'3.0.3','info':{'title':'澄心涧 API 契约草案','version':'0.2.0',
+spec = {'openapi':'3.0.3','info':{'title':'澄心涧 API 契约草案','version':'0.3.0',
  'description':'思维导图全范围；微信小程序与管理后台。Java/Spring Boot 实现。业务规则见 README。此文件不是已实现的服务。'},
  'servers':[{'url':'https://api.chengxinjian.example/api/v1','description':'示例域名，替换为测试或生产地址'}],
  'paths':{},'components':{'securitySchemes':{'userBearer':{'type':'http','scheme':'bearer'},'adminBearer':{'type':'http','scheme':'bearer'}},'schemas':{schema_names[k]:convert(v) for k,v in defs.items()}}}

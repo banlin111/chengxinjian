@@ -51,14 +51,17 @@ public class CosMediaStorage implements MediaStorage {
         String appId=properties.bucket().substring(properties.bucket().lastIndexOf('-')+1);
         return "qcs::cos:"+properties.region()+":uid/"+appId+":"+properties.bucket()+"/"+key;
     }
+    private com.tencentcloudapi.sts.v20180813.models.GetFederationTokenResponse scopedToken(String key,String action,String name) throws Exception {
+        String scope=json.writeValueAsString(Map.of("version","2.0","statement",List.of(Map.of(
+            "effect","allow","action",List.of(action),"resource",List.of(resource(key))))));
+        var request=new GetFederationTokenRequest();request.setName(name);request.setDurationSeconds(1800L);
+        request.setPolicy(java.net.URLEncoder.encode(scope,StandardCharsets.UTF_8));
+        return sts.GetFederationToken(request);
+    }
     @Override public MediaModels.Ticket ticket(String assetId,String key,String mime,long size,Instant expires) {
         initialize();
         try {
-            String scope=json.writeValueAsString(Map.of("version","2.0","statement",List.of(Map.of(
-                "effect","allow","action",List.of("name/cos:PostObject"),"resource",List.of(resource(key))))));
-            var request=new GetFederationTokenRequest();request.setName("cxjUpload");request.setDurationSeconds(1800L);
-            request.setPolicy(java.net.URLEncoder.encode(scope,StandardCharsets.UTF_8));
-            var response=sts.GetFederationToken(request);var credentials=response.getCredentials();
+            var response=scopedToken(key,"name/cos:PostObject","cxjUpload");var credentials=response.getCredentials();
             Instant effectiveExpiry=expires.isBefore(Instant.ofEpochSecond(response.getExpiredTime())) ? expires : Instant.ofEpochSecond(response.getExpiredTime());
             return signTicket(assetId,key,mime,size,effectiveExpiry,clock.instant().minusSeconds(30),credentials.getTmpSecretId(),credentials.getTmpSecretKey(),credentials.getToken());
         } catch (Exception e) { throw failure(e); }
@@ -113,8 +116,17 @@ public class CosMediaStorage implements MediaStorage {
     }
     @Override public String preview(String key,Instant expires) {
         initialize();
-        try { return cos.generatePresignedUrl(properties.bucket(),key,Date.from(expires)).toExternalForm(); }
-        catch (Exception e) { throw MediaErrors.unavailable(); }
+        try {
+            var response=scopedToken(key,"name/cos:GetObject","cxjRead");
+            var token=response.getCredentials();
+            var temporary=new com.qcloud.cos.auth.BasicSessionCredentials(token.getTmpSecretId(),token.getTmpSecretKey(),token.getToken());
+            var config=new ClientConfig(new Region(properties.region()));
+            config.setHttpProtocol(HttpProtocol.https);
+            // In this SDK generatePresignedUrl uses the client's credentials, even with a request override.
+            var signer=new COSClient(temporary,config);
+            try { return signer.generatePresignedUrl(properties.bucket(),key,Date.from(expires)).toExternalForm(); }
+            finally { signer.shutdown(); }
+        } catch(Exception ex) { throw failure(ex); }
     }
     @Override public void delete(String key) {
         initialize();try { cos.deleteObject(properties.bucket(),key); } catch (Exception e) { throw MediaErrors.unavailable(); }

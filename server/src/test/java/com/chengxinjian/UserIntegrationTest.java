@@ -46,6 +46,7 @@ class UserIntegrationTest {
     @Autowired Clock clock;
     @MockitoBean WechatGateway wechat;
     @BeforeEach void reset() {
+        CourseFixtures.clear(jdbc);
         jdbc.update("UPDATE admin_account SET teacher_id=NULL");
         for (var table:List.of("media_processing_job","media_upload_request","teacher_follow","content_teacher","media_asset","user_agreement_consent","user_auth_session","wechat_identity","user_settings","app_user","wechat_code_use","login_throttle","audit_log","auth_session")) {
             jdbc.update("DELETE FROM "+table);

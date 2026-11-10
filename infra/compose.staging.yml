@@ -1,0 +1,31 @@
+# Run with compose.yml. The reverse proxy on the host terminates TLS.
+services:
+  mysql:
+    ports: !reset []
+  app:
+    image: ${CXJ_IMAGE:?Set the locally built immutable release tag}
+    restart: unless-stopped
+    read_only: true
+    tmpfs:
+      - /tmp:size=1536m,mode=1777
+    security_opt:
+      - no-new-privileges:true
+    cap_drop: [ALL]
+    environment:
+      SPRING_PROFILES_ACTIVE: mysql,prod
+      DB_URL: jdbc:mysql://mysql:3306/chengxinjian?connectionTimeZone=UTC&forceConnectionTimeZoneToSession=true
+      DB_USERNAME: chengxinjian
+      DB_PASSWORD: ${DB_PASSWORD:?Set the database password}
+      WX_APP_ID: ${WX_APP_ID:-}
+      WX_APP_SECRET: ${WX_APP_SECRET:-}
+      STORAGE_REGION: ${STORAGE_REGION:-}
+      STORAGE_BUCKET: ${STORAGE_BUCKET:-}
+      CLOUD_SECRET_ID: ${CLOUD_SECRET_ID:-}
+      CLOUD_SECRET_KEY: ${CLOUD_SECRET_KEY:-}
+      MEDIA_PUBLIC_ORIGIN: ${MEDIA_PUBLIC_ORIGIN:?Set the HTTPS origin}
+      ADMIN_ALLOWED_ORIGINS: ${ADMIN_ALLOWED_ORIGINS:-}
+      JAVA_TOOL_OPTIONS: -XX:MaxRAMPercentage=35 -Djava.awt.headless=true
+    ports: ["127.0.0.1:18080:8080"]
+    depends_on:
+      mysql:
+        condition: service_healthy

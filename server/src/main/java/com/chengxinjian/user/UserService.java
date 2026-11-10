@@ -14,7 +14,10 @@ import static com.chengxinjian.user.UserModels.*;
 public class UserService {
     private final JdbcTemplate jdbc;
     private final ObjectMapper json;
-    public UserService(JdbcTemplate jdbc, ObjectMapper json) { this.jdbc=jdbc; this.json=json; }
+    private final com.chengxinjian.catalog.Entitlements entitlements;
+    public UserService(JdbcTemplate jdbc, ObjectMapper json, com.chengxinjian.catalog.Entitlements entitlements) {
+        this.jdbc=jdbc; this.json=json; this.entitlements=entitlements;
+    }
     public void requireActive(String id, boolean lock) {
         var rows=jdbc.queryForList("SELECT status FROM app_user WHERE id=?"+(lock ? " FOR UPDATE" : ""),String.class,id);
         if (rows.isEmpty()) { throw BusinessException.unauthenticated(); }
@@ -24,7 +27,7 @@ public class UserService {
     public User profile(String id) {
         requireActive(id,false);
         return jdbc.queryForObject("SELECT nickname,status FROM app_user WHERE id=?",(rs,n)->new User(id,rs.getString("nickname"),null,null,false,
-            roles(id),rs.getString("status"),new Membership(false,null,null,null,null,false),settings(id).theme()),id);
+            roles(id),rs.getString("status"),entitlements.membership(id),settings(id).theme()),id);
     }
     private List<String> roles(String id) {
         long linked=jdbc.queryForObject("SELECT COUNT(*) FROM content_teacher WHERE user_id=? AND status<>'archived'",Long.class,id);

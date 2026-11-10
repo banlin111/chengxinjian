@@ -1,0 +1,5 @@
+**
+!Dockerfile
+!target/
+target/**
+!target/server-0.1.0-SNAPSHOT.jar

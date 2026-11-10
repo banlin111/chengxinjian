@@ -1,4 +1,4 @@
-// 澄心涧 API contract 0.2.0; all dates ISO-8601, all IDs strings, money in fen.
+// 澄心涧 API contract 0.3.0; all dates ISO-8601, all IDs strings, money in fen.
 export type ID = string;
 export type DateTime = string;
 export type DateOnly = string;
@@ -155,3 +155,5 @@ export type SocketEvent =
   | { type: 'access.revoked'; eventId: ID; reason: string }
   | { type: 'resync_required'; eventId: ID }
   | { type: 'error'; code: string; message: string };
+
+export interface AssetProcessing { assetId: ID; status: Asset['status']; reviewStatus: 'pending' | 'approved' | 'rejected'; jobState: 'pending' | 'running' | 'done' | 'failed' | null; attempts: number; errorCode: string | null; trials: { seconds: number; state: 'pending' | 'running' | 'ready' | 'failed'; attempts: number; errorCode: string | null }[] }
