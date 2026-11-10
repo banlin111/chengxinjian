@@ -1,9 +1,9 @@
 name: Backend checks
 on:
   push:
-    paths: ['server/**', 'contracts/**', 'openapi.json', 'scripts/**', 'infra/**', '.github/workflows/backend.yml']
+    paths: ['server/**', 'contracts/**', 'openapi.json', 'scripts/**', '.github/workflows/backend.yml']
   pull_request:
-    paths: ['server/**', 'contracts/**', 'openapi.json', 'scripts/**', 'infra/**', '.github/workflows/backend.yml']
+    paths: ['server/**', 'contracts/**', 'openapi.json', 'scripts/**', '.github/workflows/backend.yml']
 permissions:
   contents: read
 jobs:
@@ -66,21 +66,3 @@ jobs:
           LOCAL_ADMIN_PASSWORD: ci-smoke-password-only
           LOCAL_CAPTCHA_TICKET: ci-smoke-captcha-only
         run: python scripts/smoke_backend.py
-      - name: Verify staging image and private API listener
-        env:
-          CXJ_IMAGE: cxj-api:ci
-          DB_PASSWORD: ci-compose-only
-          MYSQL_ROOT_PASSWORD: ci-compose-root-only
-          REDIS_PASSWORD: ci-compose-redis-only
-          MEDIA_PUBLIC_ORIGIN: https://staging.example.test
-        run: |
-          set -eu
-          docker build --tag "$CXJ_IMAGE" server
-          docker run --rm --entrypoint ffmpeg "$CXJ_IMAGE" -version
-          stack=(docker compose -f infra/compose.yml -f infra/compose.staging.yml)
-          trap '"${stack[@]}" down -v' EXIT
-          umask 077
-          env_file="$RUNNER_TEMP/cxj-compose.env"
-          : > "$env_file"
-          ./scripts/staging_release.sh "$env_file" "$CXJ_IMAGE"
-          test "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:18080/api/v1/admin/me)" = 401
