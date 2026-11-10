@@ -24,6 +24,8 @@
 
 仓库是公开的。真实配置、凭据 CSV、数据库、工具运行时、日志、截图、真实 project.config.json 不在 Git。GitHub 本机凭据使用 macOS 钥匙串；不要读取后回显，也不要把凭据嵌入 remote URL。该机 Git 使用本机代理和 HTTP/1.1，设置在本地 .git/config，不是需要给同事复制的项目配置。先检查现有授权，不索取聊天中的密码或令牌。
 
+Git 已通过本地凭据助手验证可推送；gh auth status 不一定显示登录，因为没有给 gh 配置文件落盘令牌。不要仅凭 gh 未登录就重复申请授权；必要时只在获准用途的子进程环境临时使用已有凭据，不输出、不写源码。
+
 三、优先阅读
 
 1. 仓库 README.md、docs/backend-development.md。
@@ -93,6 +95,8 @@ POST /admin/assets/{id}/preview
 
 用户与管理员使用独立账号和会话存储、独立 audience；V2 已新增 app_user、wechat_identity、user_auth_session、协议版本/同意、设置、code 消费等结构。不要再次把用户塞入 admin_account。BearerTokenFilter 仅对明确的公共媒资路由兼容两类身份，其余身份隔离保留；过期 accessToken 不应阻断合法 refresh。
 
+Settings.version 为兼容旧客户端而可省略，响应总带 version；传入时检查乐观锁，省略时事务串行、最后写入生效，不能宣称省略也能检测陈旧版本。提醒偏好目前只保存设置，不代表通知任务已发送。不要未经共同确认改成不兼容的必填字段。
+
 微信：真实 HTTPS code2Session，AppID+OpenID 唯一，业务主键为 UUID，UnionID 可缺；处理超时、无效/已用 code、供应商错误和并发，事务写入用户、同意记录和会话，不保存/下发 session_key 或 AppSecret。注册需要当前协议同意证据；本机测试协议仅 local，非 local 排除 test_only，未配置正式协议则拒绝正式注册。
 
 分类：权限、筛选、搜索、分页、发布/归档、乐观锁、幂等快照和审计；全局分类禁止 own_content 管理。课程尚无实现，建课程后还需补分类改类型、归档和课程引用的一致性。
@@ -154,6 +158,7 @@ MySQL：/Users/liuxiaopang/Codex/小程序/.tools/mysql-8.4.11-macos15-arm64
 Node：/Users/liuxiaopang/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node
 便捷启动器：/Users/liuxiaopang/Codex/小程序/.tools/bin/
 COS/验证辅助 Python：/Users/liuxiaopang/Codex/小程序/.tools/cos-runtime/bin/python
+GitHub CLI：/Users/liuxiaopang/Codex/小程序/.tools/gh/gh（官方 v2.103.3，已核对发布校验和）
 
 最近本机 MySQL 为 127.0.0.1:33306，socket /tmp/chengxinjian-mysql.sock，cxj_dev 为开发库、cxj_test 为可清理测试库；后端 127.0.0.1:18080，readiness 已核对 UP。新会话先查实际监听，不重复拉服务；若停了恢复已有实例，绝不重新初始化 mysql-data。默认 PATH 可能没有 mvn/node/npm/docker，不因此重复装整套环境。
 
