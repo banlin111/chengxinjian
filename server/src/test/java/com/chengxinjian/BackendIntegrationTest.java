@@ -241,4 +241,15 @@ class BackendIntegrationTest {
         var fields = StreamSupport.stream(java.util.Spliterators.spliteratorUnknownSize(actual.fieldNames(),0),false).toList();
         for (String field : fields) { assertThat(schema.get("properties").has(field)).as("Unexpected response field: " + field).isTrue(); }
     }
+
+    @Autowired org.springframework.boot.actuate.health.HealthContributorRegistry healthRegistry;
+    @Test void readinessFailsClosedWhenDatabaseIsDownButLivenessStaysUp() throws Exception {
+        var db=healthRegistry.unregisterContributor("db");
+        try {
+            healthRegistry.registerContributor("db",(org.springframework.boot.actuate.health.HealthIndicator)()->org.springframework.boot.actuate.health.Health.down().build());
+            mvc.perform(get("/actuator/health/readiness")).andExpect(status().isServiceUnavailable()).andExpect(jsonPath("$.status").value("DOWN")).andExpect(jsonPath("$.components").doesNotExist());
+            mvc.perform(get("/actuator/health/liveness")).andExpect(status().isOk());
+        } finally {healthRegistry.unregisterContributor("db");healthRegistry.registerContributor("db",db);}
+        mvc.perform(get("/actuator/health/readiness")).andExpect(status().isOk());
+    }
 }

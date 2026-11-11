@@ -256,6 +256,7 @@ def main():
                 probe = ide('evaluate',fn_source=(ROOT/'scripts/smoke_course_probe.js').read_text(),args_json=json.dumps([course['id'],lesson['id'],reason,seconds]))['result']
                 check('IDE wx.login, '+reason+' COS download, seek and renewal',probe['reason']==reason and probe['seconds']==seconds
                       and probe['downloadStatus']==200 and probe['creditedSeconds']==0)
+                check('IDE '+reason+' learning, favorites, likes and cross-session resume', probe.get('libraryVerified') is True and probe.get('crossSessionVerified') is True)
                 return str(uuid.UUID(probe['userId']))
 
             uid = playback('trial',1)

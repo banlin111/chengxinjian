@@ -1,0 +1,10 @@
+[Unit]
+Description=Check Chengxinjian staging every five minutes
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=5min
+Unit=cxj-monitor.service
+
+[Install]
+WantedBy=timers.target

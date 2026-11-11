@@ -6,9 +6,9 @@
 
 本文定义目标方案与接口，不代表应用已开发完成。尚无甲方答案的业务数字均需确认，原型中的价格、用户量、奖励及文案不能作为正式配置。本文、接口类型和 OpenAPI 均为同一版本的草案，双方确认后冻结。
 
-**后端当前覆盖 60 个契约方法与路径。** 已实现管理员和微信会话、分类、讲师、私有媒资、编辑审核、课程与课节、会员套餐和人工权益，以及课节播放授权、事件和恢复进度。当前契约包含 224 个方法与路径，其中播放本阶段仅支持 lesson。已验证的环境、素材和未验收项见[阶段五记录](docs/backend-stage5-2026-11-10.md)和[后端开发说明](docs/backend-development.md)。
+**后端当前覆盖 74 个契约方法与路径。** 已实现管理员和微信会话、分类、讲师、私有媒资、编辑审核、课程与课节、会员套餐和人工权益，以及课节播放授权、事件和恢复进度；新增管理员账号/角色/审计、学习历史和课程/课节收藏点赞。非 local 初始化与验证码适配、备份监测见[阶段六记录](docs/backend-stage6-2026-11-11.md)。当前契约包含 224 个方法与路径，其中播放本阶段仅支持 lesson。已验证的环境、素材和未验收项见[阶段五记录](docs/backend-stage5-2026-11-10.md)和[后端开发说明](docs/backend-development.md)。
 
-**协作接续（2026-11-11）：** 后端代码已推送至 `codex/backend-foundation`，见 [完整交接提示词](docs/handoff-prompt-2026-11-11.md) 和 [当前交接核验](docs/handoff-2026-11-11.md)。阶段五代码、自动测试、真实供应商/开发工具联调、隔离云机部署和 SSH 隧道核验的范围分别记录；公网 HTTPS、正式前端、微信真机及整体上线验收仍待完成。接口入口存在不代表对应模块已完整交付。
+**协作接续（2026-11-11）：** 当前新增实现见[阶段六记录](docs/backend-stage6-2026-11-11.md)；以下交接链接保留起点快照。 后端代码已推送至 `codex/backend-foundation`，见 [完整交接提示词](docs/handoff-prompt-2026-11-11.md) 和 [当前交接核验](docs/handoff-2026-11-11.md)。阶段五代码、自动测试、真实供应商/开发工具联调、隔离云机部署和 SSH 隧道核验的范围分别记录；公网 HTTPS、正式前端、微信真机及整体上线验收仍待完成。接口入口存在不代表对应模块已完整交付。
 
 ## 1. 阅读顺序与文件
 
@@ -705,7 +705,7 @@ export interface UploadRequest { purpose: Asset['purpose']; filename: string; mi
 export interface UploadTicket { assetId: ID; uploadUrl: string; method: 'POST'; formData: Record<string, string>; fileField: 'file'; expiresAt: DateTime; maxSizeBytes: number }
 export interface Job extends Versioned { kind: 'export' | 'transcode' | 'replay_to_course' | 'account_export'; status: 'queued' | 'running' | 'succeeded' | 'failed'; progress: number; resultUrl: string | null; resultId: ID | null; expiresAt: DateTime | null; errorCode: string | null }
 export interface AdminProfile { id: ID; username: string; displayName: string; roleIds: ID[]; permissions: string[]; dataScope: 'all' | 'own_content'; teacherId: ID | null }
-export interface AdminLogin { username: string; password: string; captchaTicket: string; otp?: string }
+export interface AdminLogin { username: string; password: string; captchaTicket: string; captchaRandstr?: string; otp?: string }
 export interface AdminAuth extends AuthTokens { admin: AdminProfile }
 export interface AdminUser extends User, Versioned { registeredAt: DateTime; lastLoginAt: DateTime | null; totalPracticeSeconds: number; streakDays: number }
 export interface UserQuery extends PageQuery { phone?: string; registeredFrom?: DateOnly; registeredTo?: DateOnly; status?: User['status']; membershipActive?: boolean }

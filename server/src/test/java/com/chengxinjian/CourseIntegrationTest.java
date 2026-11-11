@@ -206,4 +206,83 @@ class CourseIntegrationTest {
         assertThat(next.get("creditedSeconds").asInt()).isEqualTo(5);
         assertThat(http(get("/api/v1/courses/"+c),user,null,200).get("progressPercent").asInt()).isEqualTo(8);
     }
+
+    @Test void libraryPersistsAcrossSessionsAndRepeatedWritesDoNotDuplicate() throws Exception {
+        String c=create("courses",course("free")).get("id").asText(),l=create("lessons",lesson(c,0)).get("id").asText();
+        String favorite="/api/v1/me/favorites/course/"+c,like="/api/v1/me/likes/course/"+c;
+        http(put(favorite),user,Map.of("favorite",true),200);
+        var saved=http(get("/api/v1/me/favorites"),user,null,200).at("/items/0/savedAt");
+        http(put(favorite),user,Map.of("favorite",true),200);
+        try(var pool=java.util.concurrent.Executors.newFixedThreadPool(4)) {
+            var tasks=new ArrayList<java.util.concurrent.Callable<JsonNode>>();
+            for(int n=0;n<4;n++)tasks.add(()->http(put(like),user,Map.of("liked",true),200));
+            for(var f:pool.invokeAll(tasks))assertThat(f.get().get("count").asInt()).isEqualTo(1);
+        }
+        String newSession=sessions.create(uid).accessToken();
+        var result=http(get("/api/v1/me/favorites"),newSession,null,200);
+        assertThat(result.get("total").asInt()).isEqualTo(1);assertThat(result.at("/items/0/savedAt")).isEqualTo(saved);
+        var course=http(get("/api/v1/courses/"+c),newSession,null,200);
+        assertThat(course.get("favorite").asBoolean()).isTrue();assertThat(course.get("liked").asBoolean()).isTrue();assertThat(course.get("likeCount").asInt()).isEqualTo(1);
+        assertThat(http(get("/api/v1/courses/"+c),null,null,200).get("favorite").asBoolean()).isFalse();
+        http(put("/api/v1/me/favorites/lesson/"+l),user,Map.of("favorite",true),200);
+        assertThat(http(get("/api/v1/me/favorites").param("kind","lesson"),user,null,200).get("total").asInt()).isEqualTo(1);
+        http(put(like),newSession,Map.of("liked",false),200);
+        assertThat(http(get("/api/v1/courses/"+c),null,null,200).get("likeCount").asInt()).isZero();
+    }
+    @Test void hiddenContentIsExcludedButCanBeRemovedFromLibrary() throws Exception {
+        String c=create("courses",course("purchase")).get("id").asText();
+        String path="/api/v1/me/favorites/course/"+c;
+        http(put(path),user,Map.of("favorite",true),200);
+        http(delete(ADMIN+"courses/"+c),admin,Map.of("version",1,"reason","归档"),200);
+        assertThat(http(get("/api/v1/me/favorites"),user,null,200).get("total").asInt()).isZero();
+        http(put(path),user,Map.of("favorite",true),404);
+        http(put(path),user,Map.of("favorite",false),200);
+        assertThat(jdbc.queryForObject("SELECT favorite FROM user_content_relation WHERE user_id=? AND target_id=?",Boolean.class,uid,c)).isFalse();
+        http(put("/api/v1/me/favorites/noise/"+c),user,Map.of("favorite",true),400);
+        http(put("/api/v1/me/favorites/replay/"+c),user,Map.of("favorite",true),503);
+        http(get("/api/v1/me/favorites"),admin,null,403);
+        http(get("/api/v1/me/favorites"),null,null,401);
+        http(get("/api/v1/me/favorites").param("pageSize","101"),user,null,400);
+    }
+    @Test void learningUsesEventsAndSurvivesRevocationWithoutGrantingPlayback() throws Exception {
+        String c=create("courses",course("purchase")).get("id").asText(),l=create("lessons",lesson(c,0)).get("id").asText();
+        grant("course",c,null);String playback=play(l,id(),200).get("playbackId").asText();
+        jdbc.update("UPDATE lesson_playback SET last_event_at=? WHERE id=?",Timestamp.from(Instant.now().minusSeconds(20)),playback);
+        var event=json.createObjectNode().put("eventId",id()).put("sequence",1).put("kind","playing").put("positionSeconds",10)
+            .put("playedDeltaSeconds",10).put("speed",1).put("occurredAt",Instant.now().toString());
+        String key=id();http(post(PLAY+"/"+playback+"/events").header("Idempotency-Key",key),user,event,200);
+        http(post(PLAY+"/"+playback+"/events").header("Idempotency-Key",key),user,event,200);
+        String nextSession=sessions.create(uid).accessToken();
+        var list=http(get("/api/v1/me/learning").param("state","in_progress"),nextSession,null,200);
+        assertThat(list.get("total").asInt()).isEqualTo(1);assertThat(list.at("/items/0/positionSeconds").asInt()).isEqualTo(10);
+        assertThat(list.at("/items/0/progressPercent").asInt()).isEqualTo(16);assertThat(list.toString()).doesNotContain("validated/","object_key","url");
+        assertThat(play(l,id(),200).get("resumeSeconds").asInt()).isEqualTo(10);
+        assertThat(http(get("/api/v1/me/learning").param("state","completed"),user,null,200).get("total").asInt()).isZero();
+        assertThat(http(get("/api/v1/me/learning").param("state","purchased"),user,null,200).get("total").asInt()).isEqualTo(1);
+        jdbc.update("UPDATE entitlement_grant SET revoked_at=CURRENT_TIMESTAMP WHERE user_id=?",uid);
+        assertThat(http(get("/api/v1/me/learning"),user,null,200).get("total").asInt()).isEqualTo(1);
+        assertThat(http(get("/api/v1/me/learning").param("state","purchased"),user,null,200).get("total").asInt()).isZero();
+        play(l,id(),403);
+        jdbc.update("UPDATE app_user SET status='banned' WHERE id=?",uid);
+        http(get("/api/v1/me/learning"),user,null,403);
+    }
+    @Test void learningAssetReplacementAndConcurrentEventsDoNotReuseOrDoubleCredit() throws Exception {
+        String c=create("courses",course("free")).get("id").asText(),l=create("lessons",lesson(c,0)).get("id").asText();
+        String p1=play(l,id(),200).get("playbackId").asText(),p2=play(l,id(),200).get("playbackId").asText();
+        jdbc.update("UPDATE lesson_playback SET last_event_at=? WHERE user_id=?",Timestamp.from(Instant.now().minusSeconds(10)),uid);
+        try(var pool=java.util.concurrent.Executors.newFixedThreadPool(2)) {
+            var tasks=new ArrayList<java.util.concurrent.Callable<JsonNode>>();
+            for(String playback:List.of(p1,p2))tasks.add(()->http(post(PLAY+"/"+playback+"/events").header("Idempotency-Key",id()),user,
+                Map.of("eventId",id(),"sequence",1,"kind","playing","positionSeconds",10,"playedDeltaSeconds",10,"speed",1,"occurredAt",Instant.now().toString()),200));
+            for(var f:pool.invokeAll(tasks))f.get();
+        }
+        assertThat(jdbc.queryForObject("SELECT credited_seconds FROM lesson_progress WHERE user_id=?",Integer.class,uid)).isEqualTo(10);
+        assertThat(http(get("/api/v1/me/learning"),user,null,200).get("total").asInt()).isEqualTo(1);
+        String owner=jdbc.queryForObject("SELECT id FROM admin_account WHERE username='integration-admin'",String.class);
+        String replacement=asset(owner,"course_media","audio/mp4","approved",120);
+        http(put(ADMIN+"lessons/"+l),admin,lesson(c,0).put("assetId",replacement).put("version",1),200);
+        assertThat(http(get("/api/v1/me/learning"),user,null,200).get("total").asInt()).isZero();
+        assertThat(play(l,id(),200).get("resumeSeconds").asInt()).isZero();
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM lesson_progress WHERE user_id=?",Long.class,uid)).isEqualTo(1);
+    }
 }

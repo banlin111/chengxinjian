@@ -5,8 +5,6 @@ import com.chengxinjian.common.BusinessException;
 import java.sql.Timestamp;
 import java.time.Clock;
 import java.util.UUID;
-import org.springframework.core.env.Environment;
-import org.springframework.core.env.Profiles;
 import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -22,28 +20,33 @@ public class AdminAuthService {
     private final AdminRepository admins;
     private final PasswordEncoder passwords;
     private final AuthProperties properties;
-    private final Environment environment;
+    private final CaptchaVerification captcha;
+    private final org.springframework.transaction.support.TransactionTemplate transactions;
     private final Clock clock;
     private final AuditService audit;
     private final LoginThrottle throttle;
     private final String dummyPasswordHash;
 
     public AdminAuthService(JdbcTemplate jdbc, AdminRepository admins, PasswordEncoder passwords,
-        AuthProperties properties, Environment environment, Clock clock, AuditService audit, LoginThrottle throttle) {
+        AuthProperties properties, CaptchaVerification captcha, Clock clock, AuditService audit, LoginThrottle throttle,
+        org.springframework.transaction.PlatformTransactionManager transactionManager) {
         this.jdbc = jdbc; this.admins = admins; this.passwords = passwords; this.properties = properties;
-        this.environment = environment; this.clock = clock; this.audit = audit; this.throttle = throttle;
+        this.captcha = captcha; this.transactions = new org.springframework.transaction.support.TransactionTemplate(transactionManager); this.clock = clock; this.audit = audit; this.throttle = throttle;
         this.dummyPasswordHash = passwords.encode(TokenSecrets.generate());
     }
-    @Transactional
     public LoginResult login(AdminAuthController.LoginInput input, String remoteAddress) {
         throttle.attempt(input.username(), remoteAddress);
-        verifyCaptcha(input.captchaTicket());
+        captcha.verify(input.captchaTicket(),input.captchaRandstr(),remoteAddress);
+        return transactions.execute(status -> passwordLogin(input));
+    }
+    private LoginResult passwordLogin(AdminAuthController.LoginInput input) {
         if (input.password().getBytes(java.nio.charset.StandardCharsets.UTF_8).length > 72) {
             throw BusinessException.invalid("密码超出允许长度");
         }
         if (input.otp() != null && !input.otp().isBlank()) {
             throw new BusinessException(HttpStatus.SERVICE_UNAVAILABLE, "PROVIDER_UNAVAILABLE", "暂未配置二次验证服务");
         }
+        jdbc.queryForList("SELECT id FROM admin_account WHERE username=? FOR UPDATE",input.username());
         var account = admins.byUsername(input.username());
         boolean valid = passwords.matches(input.password(), account.map(AdminRepository.Account::passwordHash).orElse(dummyPasswordHash));
         if (!valid || account.isEmpty() || !account.get().enabled()) {
@@ -54,15 +57,6 @@ public class AdminAuthService {
         audit.record(id, "admin.login", id, null);
         return new LoginResult(tokens.accessToken(), tokens.refreshToken(), tokens.expiresIn(),
             tokens.refreshExpiresIn(), tokens.tokenType(), admins.principal(id));
-    }
-    private void verifyCaptcha(String ticket) {
-        if (!"local".equals(properties.captchaMode())) {
-            throw new BusinessException(HttpStatus.SERVICE_UNAVAILABLE, "PROVIDER_UNAVAILABLE", "尚未配置验证码服务");
-        }
-        if (!environment.acceptsProfiles(Profiles.of("local")) || properties.localCaptchaTicket().isBlank()
-            || !TokenSecrets.equal(ticket, properties.localCaptchaTicket())) {
-            throw BusinessException.invalid("验证码校验失败");
-        }
     }
     private Tokens newTokens() {
         return new Tokens(TokenSecrets.generate(), TokenSecrets.generate(), properties.accessTtl().toSeconds(),

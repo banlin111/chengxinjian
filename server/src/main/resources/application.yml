@@ -36,6 +36,9 @@ management:
       show-details: never
       probes:
         enabled: true
+      group:
+        readiness:
+          include: readinessState,db
 logging:
   level:
     com.qcloud.cos: 'OFF'
@@ -48,11 +51,16 @@ app:
   auth:
     access-ttl: PT2H
     refresh-ttl: P30D
-    captcha-mode: unavailable
+    captcha-mode: ${CAPTCHA_MODE:unavailable}
     local-captcha-ticket: ''
     bootstrap-username: ''
     bootstrap-password: ''
     allowed-origins: ${ADMIN_ALLOWED_ORIGINS:}
+  captcha:
+    app-id: ${CAPTCHA_APP_ID:0}
+    app-secret-key: ${CAPTCHA_APP_SECRET_KEY:}
+    secret-id: ${CAPTCHA_SECRET_ID:}
+    secret-key: ${CAPTCHA_SECRET_KEY:}
   wechat:
     app-id: ${WX_APP_ID:}
     app-secret: ${WX_APP_SECRET:}

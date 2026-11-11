@@ -13,7 +13,9 @@ import org.springframework.web.bind.annotation.*;
 public class AdminAuthController {
     public record LoginInput(@NotBlank @Size(max=64) String username,
         @NotBlank @Size(min=12, max=64) String password,
-        @NotBlank @Size(max=2048) String captchaTicket, @Size(max=32) String otp) {}
+        @NotBlank @Size(max=2048) String captchaTicket, @Size(max=256) String captchaRandstr, @Size(max=32) String otp) {
+        @Override public String toString() { return "LoginInput[redacted]"; }
+    }
     public record RefreshInput(@NotBlank @Size(max=256) String refreshToken) {}
     public record OK(boolean success) {}
     private final AdminAuthService auth;

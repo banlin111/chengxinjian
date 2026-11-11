@@ -35,13 +35,36 @@ async function exerciseCourse(courseId, lessonId, expectedReason, seconds) {
     if (ack.creditedSeconds || ack.completed) throw Error('TRIAL_EVENT_FAILED')
     const renewal = await call('/playbacks/' + ticket.playbackId + '/renew', 'POST', undefined, key())
     if (renewal.access.reason !== expectedReason) throw Error('RENEWAL_FAILED')
+    await call('/me/favorites/course/' + courseId, 'PUT', {favorite:true})
+    await call('/me/favorites/course/' + courseId, 'PUT', {favorite:true})
+    await call('/me/likes/course/' + courseId, 'PUT', {liked:true})
+    const liked = await call('/me/likes/course/' + courseId, 'PUT', {liked:true})
+    if (!liked.liked || liked.count !== 1) throw Error('LIKE_DEDUP_FAILED')
+    await call('/auth/logout','POST',{refreshToken:session.refreshToken})
+    session = undefined
+    const nextCode = await new Promise((resolve,reject)=>wx.login({success:r=>resolve(r.code),fail:()=>reject(Error('WX_RELOGIN_FAILED'))}))
+    session = await call('/auth/wechat/login','POST',{code:nextCode,agreements})
+    const history = await call('/me/learning','GET')
+    const item = history.items.find(i=>i.lessonId===lessonId)
+    if (!item || item.positionSeconds!==1 || item.completed || item.progressPercent!==0) throw Error('LEARNING_HISTORY_FAILED')
+    const favorites = await call('/me/favorites?kind=course','GET')
+    if (!favorites.items.some(i=>i.target.id===courseId)) throw Error('FAVORITE_PERSISTENCE_FAILED')
+    const course = await call('/courses/'+courseId,'GET')
+    if (!course.favorite || !course.liked || course.likeCount!==1) throw Error('PERSONAL_CATALOG_FAILED')
+    const resumed = await call('/playbacks','POST',{target:{kind:'lesson',id:lessonId},platform:'wechat_ios'},key())
+    if (resumed.resumeSeconds!==1) throw Error('CROSS_SESSION_RESUME_FAILED')
     const profile = await call('/me', 'GET')
-    return {userId:profile.id, reason:expectedReason, seconds:ticket.durationSeconds, downloadStatus:result.statusCode, creditedSeconds:ack.creditedSeconds}
+    return {userId:profile.id, reason:expectedReason, seconds:ticket.durationSeconds, downloadStatus:result.statusCode, creditedSeconds:ack.creditedSeconds, libraryVerified:true, crossSessionVerified:true}
   } finally {
     try {
       if (downloaded) await new Promise(resolve => wx.getFileSystemManager().unlink({filePath:downloaded,complete:resolve}))
     } finally {
-      if (session) await call('/auth/logout','POST',{refreshToken:session.refreshToken})
+      if (session) {
+        try {
+          await call('/me/favorites/course/'+courseId,'PUT',{favorite:false})
+          await call('/me/likes/course/'+courseId,'PUT',{liked:false})
+        } finally { await call('/auth/logout','POST',{refreshToken:session.refreshToken}) }
+      }
     }
   }
 }

@@ -91,7 +91,7 @@ export interface UploadRequest { purpose: Asset['purpose']; filename: string; mi
 export interface UploadTicket { assetId: ID; uploadUrl: string; method: 'POST'; formData: Record<string, string>; fileField: 'file'; expiresAt: DateTime; maxSizeBytes: number }
 export interface Job extends Versioned { kind: 'export' | 'transcode' | 'replay_to_course' | 'account_export'; status: 'queued' | 'running' | 'succeeded' | 'failed'; progress: number; resultUrl: string | null; resultId: ID | null; expiresAt: DateTime | null; errorCode: string | null }
 export interface AdminProfile { id: ID; username: string; displayName: string; roleIds: ID[]; permissions: string[]; dataScope: 'all' | 'own_content'; teacherId: ID | null }
-export interface AdminLogin { username: string; password: string; captchaTicket: string; otp?: string }
+export interface AdminLogin { username: string; password: string; captchaTicket: string; captchaRandstr?: string; otp?: string }
 export interface AdminAuth extends AuthTokens { admin: AdminProfile }
 export interface AdminUser extends User, Versioned { registeredAt: DateTime; lastLoginAt: DateTime | null; totalPracticeSeconds: number; streakDays: number }
 export interface UserQuery extends PageQuery { phone?: string; registeredFrom?: DateOnly; registeredTo?: DateOnly; status?: User['status']; membershipActive?: boolean }

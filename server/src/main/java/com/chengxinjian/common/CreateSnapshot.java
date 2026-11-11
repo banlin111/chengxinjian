@@ -19,15 +19,27 @@ public class CreateSnapshot {
     private final JdbcTemplate jdbc;
     private final ObjectMapper json;
     private final Clock clock;
-    public CreateSnapshot(JdbcTemplate jdbc, ObjectMapper json, Clock clock) {
+    private final org.springframework.security.crypto.password.PasswordEncoder passwords;
+    public CreateSnapshot(JdbcTemplate jdbc, ObjectMapper json, Clock clock, org.springframework.security.crypto.password.PasswordEncoder passwords) {
         this.jdbc = jdbc;
         this.json = json;
-        this.clock = clock;
+        this.clock = clock; this.passwords=passwords;
     }
 
     @Transactional(propagation=Propagation.MANDATORY)
     public JsonNode admin(String actor, String operation, String key, Object input,
                           Consumer<String> authorizeReplay, Supplier<JsonNode> create) {
+        return store(actor,operation,key,input,authorizeReplay,create,false);
+    }
+
+    // Password-bearing commands must not create a fast offline password verifier in request_hash.
+    @Transactional(propagation=Propagation.MANDATORY)
+    public JsonNode adminSensitive(String actor,String operation,String key,Object input,
+            Consumer<String> authorizeReplay,Supplier<JsonNode> create) {
+        return store(actor,operation,key,input,authorizeReplay,create,true);
+    }
+    private JsonNode store(String actor,String operation,String key,Object input,
+            Consumer<String> authorizeReplay,Supplier<JsonNode> create,boolean sensitive) {
         try {
             if (!UUID.fromString(key).toString().equalsIgnoreCase(key)) throw new IllegalArgumentException();
         } catch (IllegalArgumentException ex) {
@@ -40,7 +52,8 @@ public class CreateSnapshot {
         if (!records.isEmpty()) {
             var record = records.getFirst();
             authorizeReplay.accept((String)record.get("result_id"));
-            if (!hash.equals(record.get("request_hash"))) {
+            String stored=(String)record.get("request_hash");
+            if (!(sensitive ? passwords.matches(hash,stored) : hash.equals(stored))) {
                 throw new BusinessException(HttpStatus.CONFLICT,"IDEMPOTENCY_CONFLICT","相同幂等标识不能用于不同请求");
             }
             try { return json.readTree((String)record.get("result_json")); }
@@ -48,7 +61,7 @@ public class CreateSnapshot {
         }
         var result = create.get();
         jdbc.update("INSERT INTO idempotency_record(actor_id,operation,idempotency_key,request_hash,result_id,result_json,created_at) VALUES (?,?,?,?,?,?,?)",
-            actor, operation, key, hash, result.get("id").asText(), result.toString(), Timestamp.from(clock.instant()));
+            actor, operation, key, sensitive ? passwords.encode(hash) : hash, result.get("id").asText(), result.toString(), Timestamp.from(clock.instant()));
         return result;
     }
 }

@@ -111,7 +111,10 @@ public class CourseCatalog {
             .put("coverUrl",Objects.toString(r.getString("public_url"),"")).put("categoryId",r.getString("category_id"))
             .put("teacherId",r.getString("teacher_id")).put("difficulty",r.getString("difficulty")).put("totalSeconds",r.getLong("duration"))
             .put("lessonCount",r.getLong("lesson_count")).put("priceFen",r.getInt("price_fen")).put("originalPriceFen",(Integer)r.getObject("original_price_fen"))
-            .put("accessPolicy",policy).put("favorite",false).put("liked",false).put("likeCount",0);
+            .put("accessPolicy",policy).put("favorite",false).put("liked",false);
+        result.put("likeCount",jdbc.queryForObject("SELECT COUNT(*) FROM user_content_relation WHERE kind='course' AND target_id=? AND liked=TRUE",Long.class,id));
+        if(user!=null) jdbc.query("SELECT favorite,liked FROM user_content_relation WHERE user_id=? AND kind='course' AND target_id=?",
+            (org.springframework.jdbc.core.RowCallbackHandler)row->{result.put("favorite",row.getBoolean(1));result.put("liked",row.getBoolean(2));},user.id(),id);
         result.put("learnerCount",jdbc.queryForObject("SELECT COUNT(DISTINCT p.user_id) FROM lesson_progress p JOIN content_lesson l ON l.id=p.lesson_id WHERE l.course_id=? AND p.credited_seconds>0",Long.class,id));
         long duration=r.getLong("duration");
         long credited=user==null || duration==0 ? 0 : jdbc.queryForObject("SELECT COALESCE(SUM(p.credited_seconds),0) FROM lesson_progress p JOIN content_lesson l ON l.id=p.lesson_id AND l.asset_id=p.asset_id JOIN media_asset a ON a.id=l.asset_id WHERE "+LESSON_VISIBLE+" AND l.course_id=? AND p.user_id=?",Long.class,id,user.id());

@@ -46959,6 +46959,9 @@
           "captchaTicket": {
             "type": "string"
           },
+          "captchaRandstr": {
+            "type": "string"
+          },
           "otp": {
             "type": "string"
           }
