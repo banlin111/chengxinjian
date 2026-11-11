@@ -136,4 +136,20 @@ class AdminSecurityIntegrationTest {
         jdbc.update("DELETE FROM admin_account WHERE id=?",created.get("id").asText());
         http(delete("/api/v1/admin/roles/"+roleId),token,null,200);
     }
+
+    @Test void legacyAccountScopeDoesNotWidenOnNameOrRolePermissionEdits()throws Exception {
+        var limited=http(post("/api/v1/admin/roles").header("Idempotency-Key",id()),token,Map.of("name","历史共享角色"+id(),"permissions",List.of("content:read"),"dataScope","all"),200);
+        String roleId=limited.get("id").asText(),teacher=id();var now=java.sql.Timestamp.from(java.time.Instant.now());
+        jdbc.update("INSERT INTO content_teacher(id,name,bio,credentials_json,status,created_at,updated_at) VALUES (?,'历史讲师','','[]','published',?,?)",teacher,now,now);
+        var body=account("security-"+id(),List.of(roleId));body.put("teacherId",teacher);
+        var created=http(post("/api/v1/admin/accounts").header("Idempotency-Key",id()),token,body,200);String target=created.get("id").asText();
+        jdbc.update("UPDATE admin_account SET data_scope='own_content' WHERE id=?",target);
+        body.remove("initialPassword");body.put("version",1);body.put("displayName","修改显示名");
+        http(put("/api/v1/admin/accounts/"+target),token,body,200);
+        assertThat(jdbc.queryForObject("SELECT data_scope FROM admin_account WHERE id=?",String.class,target)).isEqualTo("own_content");
+        http(put("/api/v1/admin/roles/"+roleId),token,Map.of("name",limited.get("name").asText(),"permissions",List.of("content:read","content:write"),"dataScope","all","version",1),200);
+        assertThat(jdbc.queryForObject("SELECT data_scope FROM admin_account WHERE id=?",String.class,target)).isEqualTo("own_content");
+        jdbc.update("DELETE FROM admin_account_role WHERE account_id=?",target);jdbc.update("DELETE FROM admin_account WHERE id=?",target);
+        http(delete("/api/v1/admin/roles/"+roleId),token,null,200);jdbc.update("DELETE FROM content_teacher WHERE id=?",teacher);
+    }
 }

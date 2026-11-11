@@ -136,6 +136,9 @@ public class AdminAccessManagement {
         for(String accountId:jdbc.queryForList("SELECT account_id FROM admin_account_role WHERE role_id=? ORDER BY account_id",String.class,id)) {
             var a=account(accountId);var ids=new ArrayList<String>();a.get("roleIds").forEach(v->ids.add(v.asText()));
             String scope=roles(current,ids,a.get("teacherId").isNull()?null:a.get("teacherId").asText());
+            // V1-V7 stored scope on accounts, including restricted accounts sharing a global role.
+            // A permissions-only edit of that legacy role must not silently widen those accounts.
+            if(old.get("dataScope").asText().equals(input.dataScope()) && "own_content".equals(jdbc.queryForObject("SELECT data_scope FROM admin_account WHERE id=?",String.class,accountId))) scope="own_content";
             jdbc.update("UPDATE admin_account SET data_scope=?,version=version+1,updated_at=? WHERE id=?",scope,now(),accountId);
         }
         lastAdministrator();audit.record(actor.id(),"admin.role.update",id,null);return ApiResponse.ok(role(id));
@@ -174,6 +177,11 @@ public class AdminAccessManagement {
     ApiResponse<ObjectNode> updateAccount(@AuthenticationPrincipal AdminPrincipal actor,@PathVariable String id,@RequestBody @Valid AccountUpdate input) {
         var current=allowed(actor,"rbac:write",true);var old=account(id);version(input.version(),old.get("version").asInt());targetPowers(current,id);
         String scope=roles(current,input.roleIds(),input.teacherId());
+        var previousRoles=new HashSet<String>();old.get("roleIds").forEach(v->previousRoles.add(v.asText()));
+        if(previousRoles.equals(new HashSet<>(input.roleIds())) && "own_content".equals(jdbc.queryForObject("SELECT data_scope FROM admin_account WHERE id=?",String.class,id))) {
+            scope="own_content";
+            if(input.teacherId()==null)throw BusinessException.invalid("本人内容账号必须保留讲师绑定");
+        }
         jdbc.update("UPDATE admin_account SET username=?,display_name=?,enabled=?,data_scope=?,teacher_id=?,version=version+1,updated_at=? WHERE id=?",
             input.username(),input.displayName(),input.enabled(),scope,input.teacherId(),now(),id);
         assign(id,input.roleIds());lastAdministrator();

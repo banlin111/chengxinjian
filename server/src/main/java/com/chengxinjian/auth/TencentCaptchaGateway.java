@@ -15,6 +15,11 @@ import org.springframework.stereotype.Component;
 @Component
 @EnableConfigurationProperties(CaptchaProperties.class)
 public class TencentCaptchaGateway implements CaptchaGateway {
+    // Reuse the connection pool across login attempts; never allocate a pool/thread set per ticket.
+    private static final okhttp3.OkHttpClient HTTP=new okhttp3.OkHttpClient.Builder()
+        .connectTimeout(3,java.util.concurrent.TimeUnit.SECONDS).readTimeout(5,java.util.concurrent.TimeUnit.SECONDS)
+        .writeTimeout(5,java.util.concurrent.TimeUnit.SECONDS).callTimeout(8,java.util.concurrent.TimeUnit.SECONDS)
+        .followRedirects(false).followSslRedirects(false).retryOnConnectionFailure(false).build();
     private final CaptchaProperties properties;
     public TencentCaptchaGateway(CaptchaProperties properties) { this.properties=properties; }
     static BusinessException unavailable() {
@@ -27,10 +32,7 @@ public class TencentCaptchaGateway implements CaptchaGateway {
         request.setTicket(ticket); request.setRandstr(randstr); request.setUserIp(remoteAddress);
         var http=new HttpProfile(); http.setEndpoint("captcha.tencentcloudapi.com"); http.setProtocol("https://");
         http.setConnTimeout(3); http.setReadTimeout(5); http.setWriteTimeout(5);
-        http.setHttpClient(new okhttp3.OkHttpClient.Builder().connectTimeout(3,java.util.concurrent.TimeUnit.SECONDS)
-            .readTimeout(5,java.util.concurrent.TimeUnit.SECONDS).writeTimeout(5,java.util.concurrent.TimeUnit.SECONDS)
-            .callTimeout(8,java.util.concurrent.TimeUnit.SECONDS).followRedirects(false).followSslRedirects(false)
-            .retryOnConnectionFailure(false).build());
+        http.setHttpClient(HTTP);
         var profile=new ClientProfile(); profile.setHttpProfile(http); profile.setDebug(false);
         try {
             var client=new CaptchaClient(new Credential(properties.secretId(),properties.secretKey()),"",profile);
