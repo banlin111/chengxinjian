@@ -30,7 +30,7 @@
 
 `AdminBootstrapCommand` 为独立 Java 命令，没有 HTTP 初始化入口；不启动 Web、worker、local 种子或自动迁移。操作前先备份并应用 V8。仅连接显式配置的 MySQL，事务锁定一次性控制行；已有任何管理员或持久化标记已消费时拒绝。创建安全随机业务 ID、BCrypt 密码、全局系统管理员角色和审计，权限来自当前字典；以后新增权限不会默默授予旧角色。
 
-在受控服务器终端运行 `python3 scripts/bootstrap_admin.py --database-env /私有/backend.env --jar /已验证/app.jar`。配置文件仅包含 DB_URL/DB_USERNAME/DB_PASSWORD，0600、本人持有、非符号链接。用户名、显示名、初始化原因交互输入，密码双次 getpass；通过子进程 stdin 传入 Java，不进命令参数、历史、环境变量或日志。不会自动生成并公布正式密码。可在私有容器终端直接使用 PropertiesLauncher 启动该命令，输入仍须走私有管道。已有账号不能用此工具重置或“重新成为首位管理员”，以后走受控重置接口。
+在受控服务器终端运行 `python3 scripts/bootstrap_admin.py --database-env /私有/backend.env --jar /已验证/app.jar`。配置文件仅包含 DB_URL/DB_USERNAME/DB_PASSWORD，0600、本人持有、非符号链接。用户名、显示名、初始化原因交互输入，密码双次 getpass；通过子进程 stdin 传入 Java，不进命令参数、历史、环境变量或日志。不会自动生成并公布正式密码。现有隔离云机无需安装宿主 Java：在服务器受控终端使用 `sudo python3 /opt/cxj/ops/bootstrap_admin.py --docker-container cxj_staging-app-1`，复用已部署应用容器内 Java、JAR 和私有数据库环境，密码仍经 stdin 管道传递，不使用 `docker exec -e PASSWORD=...`。已有账号不能用此工具重置或“重新成为首位管理员”，以后走受控重置接口。
 
 初始化不绕过验证码。云机实测管理员数量为0，尚未创建负责人管理员；需确定账号负责人并在私有终端设置密码后才能使用。演练仅在可清理的本机 cxj_test 执行，命令 `python3 scripts/smoke_admin_bootstrap.py --run-isolated-bootstrap` 会清空该测试库，禁止并发运行或改成开发/云端业务库。
 
@@ -63,15 +63,15 @@
 | 验收层级 | 结果与限制 |
 |---|---|
 | 1 代码 | 本文 14 个入口、离线初始化、验证码适配、备份/监测脚本；部分业务类型限制如上 |
-| 2 自动测试 | H2 与原生 MySQL 8.4.11 各108项通过，无失败/错误/跳过；脚本8项通过，契约224方法/785对象及 OpenAPI 校验通过；验证码供应商使用替身 |
+| 2 自动测试 | H2 与原生 MySQL 8.4.11 各108项通过，无失败/错误/跳过；脚本10项通过，契约224方法/785对象及 OpenAPI 校验通过；验证码供应商使用替身 |
 | 3 真实第三方开发联调 | 微信 IDE + 真实 code2Session/STS/COS/FFmpeg 81 检查通过，包含新学习记录/收藏/点赞、跨登录会话及人工权益授予/撤销；合成 PNG/JPEG/WebP/WAV/4秒MP4，最多1秒试听。fixture_cleanup=true。不是腾讯验证码、支付或真机验收 |
-| 4 隔离云机/SSH 隧道 | 旧版本状态已重查；每日备份、每五分钟监测已安装并首次执行成功，异机副本已核 SHA-256。已部署 cxj-api:0c09472，JAR 与本机 SHA-256 相同；升级前恢复核对35表/V1–V7，升级后恢复核对38表/V1–V8，各自源库前后与恢复库 CHECKSUM 一致并移除演练库。暂回退2274752后基础检查通过，再恢复0c09472；9项隧道路由检查通过。没有云端已登录业务验收，因无正式验证码/协议/凭据 |
+| 4 隔离云机/SSH 隧道 | 旧版本状态已重查；每日备份、每五分钟监测已安装并首次执行成功，异机副本已核 SHA-256。最终部署 cxj-api:b350faf，JAR 与本机及最终真实探针运行的 SHA-256 相同；升级前恢复核对35表/V1–V7，升级后恢复核对38表/V1–V8，各自源库前后与恢复库 CHECKSUM 一致并移除演练库。暂回退2274752后基础检查通过，再恢复0c09472；随后安全修正b350faf部署完成，最终9项隧道路由检查重新通过。没有云端已登录业务验收，因无正式验证码/协议/凭据 |
 | 5 公网 HTTPS | 未通过；无域名 |
 | 6 正式前端/微信真机 | 未通过；本轮只维护独立探针 |
 | 7 上线验收 | 未通过；其他既定业务、真实素材容量/长播/弱网/后台音频及外部条件仍有缺口 |
 
-部署提交 `0c09472ee01d01c5ef328425dd1fddf1c364b6af` 已正常推送，[GitHub Actions 42948814939](https://github.com/banlin111/chengxinjian/actions/runs/42948814939) 的 backend/contracts 均 completed/success。部署目录 /opt/cxj/releases/0c09472；实际镜像 ID 前缀7aff865cfd74；非root/只读根目录、API只绑定127.0.0.1:18080、数据库无宿主映射。云端实际 mysql,prod，未注入 local 密码/票据、微信/COS密钥或媒资公开源，CAPTCHA_MODE=unavailable。云机启动不代表新管理接口已通过真实登录验收。
+阶段六初次部署提交 `0c09472ee01d01c5ef328425dd1fddf1c364b6af` 已正常推送，[GitHub Actions 42948814939](https://github.com/banlin111/chengxinjian/actions/runs/42948814939) 的 backend/contracts 均 completed/success。最终安全修正 `b350faf905cc32d74090e8b1e2c328c756bce886` 的 [GitHub Actions 42950100322](https://github.com/banlin111/chengxinjian/actions/runs/42950100322) 也为 backend/contracts 均成功；最终目录 /opt/cxj/releases/b350faf、镜像 cxj-api:b350faf、镜像ID前缀913b26ef1a27。非root/只读根目录、API只绑定127.0.0.1:18080、数据库无宿主映射。云端实际 mysql,prod，未注入 local 密码/票据、微信/COS密钥或媒资公开源，CAPTCHA_MODE=unavailable。云机启动不代表新管理接口已通过真实登录验收。
 
-新版本第一次隧道逐路由请求曾超时；云机内部服务正常，后续重新实测9项通过，超时未伪报为通过，也未以旧检查顶替。监测使用不存在的容器名作独立故障演练，systemd-run 返回非零且私有报告 task_inspection_failed，恢复正确容器后状态ok。外部告警仍未配置。备份定时器与本机每小时拉取均已加载，两个自动全备的异机副本校验通过；尚未经历完整14/30天保留周期。开发库升级前已私有备份，现有数据目录保留并迁移到V8，本机18080 readiness UP。
+新版本第一次隧道逐路由请求曾超时；云机内部服务正常，后续重新实测9项通过，超时未伪报为通过，也未以旧检查顶替。监测使用不存在的容器名作独立故障演练，systemd-run 返回非零且私有报告 task_inspection_failed，恢复正确容器后状态ok。外部告警仍未配置。备份定时器与本机每小时拉取均已加载，三个自动全备的异机副本校验通过；尚未经历完整14/30天保留周期。开发库升级前已私有备份，现有数据目录保留并迁移到V8，本机18080 readiness UP。
 
 本地证据在忽略的 server/target/stage6-* 及 course-cos-smoke/result.json；初始化报告覆盖8项打包非local检查。历史阶段五结果不能替代本轮执行。本轮未购买新云资源，未上传、提审或发布小程序。
