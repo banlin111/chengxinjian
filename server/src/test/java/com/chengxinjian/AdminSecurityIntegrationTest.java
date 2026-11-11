@@ -117,6 +117,7 @@ class AdminSecurityIntegrationTest {
     }
 
     @Test void roleEditsImmediatelyAffectExistingSessionsAndAuditIsPermissionProtected()throws Exception {
+        String today=java.time.LocalDate.now(java.time.ZoneId.of("Asia/Shanghai")).toString();
         var limited=http(post("/api/v1/admin/roles").header("Idempotency-Key",id()),token,Map.of("name","只读角色"+id(),"permissions",List.of("content:read"),"dataScope","all"),200);
         String roleId=limited.get("id").asText();
         var created=createAccount("security-"+id(),List.of(roleId));String username=created.get("username").asText();
@@ -126,8 +127,8 @@ class AdminSecurityIntegrationTest {
         http(put("/api/v1/admin/roles/"+roleId),token,update,200);
         http(get("/api/v1/admin/content/categories"),reader,null,403);
         http(put("/api/v1/admin/roles/"+roleId),token,update,409);
-        http(get("/api/v1/admin/audit-logs").param("from","2026-11-01").param("to","2026-11-30"),reader,null,403);
-        var logs=http(get("/api/v1/admin/audit-logs").param("from","2026-11-01").param("to","2026-11-30").param("operatorId",actor).param("action","admin.role.update"),token,null,200);
+        http(get("/api/v1/admin/audit-logs").param("from",today).param("to",today),reader,null,403);
+        var logs=http(get("/api/v1/admin/audit-logs").param("from",today).param("to",today).param("operatorId",actor).param("action","admin.role.update"),token,null,200);
         assertThat(logs.get("total").asInt()).isPositive();
         var body=account(username,List.of(roleId));http(post("/api/v1/admin/accounts").header("Idempotency-Key",id()),token,body,409);
         jdbc.update("DELETE FROM auth_session WHERE account_id=?",created.get("id").asText());

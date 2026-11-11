@@ -60,7 +60,8 @@ def main():
                LOCAL_ADMIN_PASSWORD=password, LOCAL_CAPTCHA_TICKET=captcha)
     java = next((ROOT.parent / '.tools').glob('jdk-*/Contents/Home/bin/java'))
     jar = ROOT / 'server/target/server-0.1.0-SNAPSHOT.jar'
-    report = {'checks': [], 'fixture_cleanup': False, 'test_database': 'cxj_test'}
+    report = {'checks': [], 'fixture_cleanup': False, 'test_database': 'cxj_test',
+              'jar_sha256': hashlib.sha256(jar.read_bytes()).hexdigest(), 'started_at_epoch': int(time.time())}
     created = []
     review_role = str(uuid.uuid4())
     derived_keys = []
