@@ -1,0 +1,37 @@
+page { min-height: 100%; background-color: #0F1D1F; font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif; }
+body { margin: 0; background: var(--app-background, #16302F); }
+view, button, input { box-sizing: border-box; }
+button[class] { margin: 0; padding: 0; color: inherit; font: inherit; line-height: 1.5; border-radius: 0; background: transparent; }
+button[class]::after { border: 0; }
+button[disabled] { opacity: .5; color: inherit; }
+image { display: block; }
+/* H5 exposes its fixed tab bar through --window-bottom; native WeChat's
+   viewport already excludes that bar. Do not subtract it a second time. */
+.page-shell { min-height: calc(100vh - var(--window-bottom, 0px)); color: var(--text, #fff); background: var(--bg, #0F1D1F); padding-bottom: 28px;  }
+.page-shell.home-page { padding-bottom: 30px; background-image: var(--page-gradient); background-size: 100% max(812px, 100vh); background-repeat: no-repeat; }
+.page-header { padding: var(--top) 24px 24px; }
+.page-title { display: block; font-size: 24px; font-weight: 650; letter-spacing: .5px; }
+.page-subtitle { display: block; margin-top: 7px; color: var(--muted); font-size: 12px; line-height: 1.7; }
+.section { padding: 0 20px; }
+.section-heading { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+.section-title { font-size: 18px; font-weight: 650; }
+button.text-link { font-size: 11px; color: var(--muted); padding: 8px 0 8px 12px; }
+.muted { color: var(--muted); }
+.gold { color: var(--gold); }
+.pressable {  }
+.is-pressed {  }
+button.primary-button { display: inline-flex; align-items: center; justify-content: center; background: var(--accent); color: #fff; border-radius: 30px; padding: 10px 20px; font-size: 13px; font-weight: 600; }
+button.outline-button { display: inline-flex; border: 1px solid var(--line); padding: 9px 20px; border-radius: 24px; color: var(--text); font-size: 13px; }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 20px; padding: 20px; }
+.preview-note { font-size: 10px; letter-spacing: .5px; color: var(--muted); opacity: .8; text-align: center; padding: 18px 20px 0; }
+.state-card { margin: 20px; padding: 36px 22px; text-align: center; border: 1px solid var(--line); border-radius: 20px; }
+.state-title { display: block; font-size: 18px; margin-bottom: 10px; }
+.state-description { display: block; font-size: 13px; color: var(--muted); line-height: 1.8; margin-bottom: 20px; }
+.skeleton { background: var(--surface); border-radius: 16px;  }
+@keyframes skeleton { from { opacity: .45; } to { opacity: 1; } }
+.motion-reduced view, .motion-reduced button, .motion-reduced image, .motion-reduced text,
+.page-inactive view, .page-inactive button, .page-inactive image, .page-inactive text { animation: none !important; transition: none !important; }
+/* H5 previews retain real responsive width; no artificial phone bezel or status bar. */
+/* #ifdef H5 */
+@media (min-width: 600px) { uni-app { max-width: 375px; margin: 0 auto; border-inline: 1px solid #2a3d33; } uni-tabbar .uni-tabbar { max-width: 375px; margin: 0 auto; } }
+/* #endif */

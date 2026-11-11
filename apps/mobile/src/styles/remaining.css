@@ -1,0 +1,115 @@
+/* Shared refinements for S9–S22; source layout and source assets remain the baseline. */
+.screen-refined { color: var(--text); }
+.pdf-screen.screen-refined .legacy-action { min-height: 44px; min-width: 44px; text-align: inherit; }
+.pdf-screen.screen-refined .legacy-action.u-text-center { text-align: center; }
+.pdf-screen.screen-refined .legacy-action.u-w-full { display: block; text-align: center; }
+.pdf-screen.screen-refined .u-choice-group > .legacy-action { transition: transform 320ms cubic-bezier(.22,1,.36,1),background-color 160ms ease,border-color 160ms ease; }
+.pdf-screen.screen-refined .u-choice-group > .legacy-action.feedback-icon { opacity: 1; }
+.pdf-screen.screen-refined .u-choice-group > .legacy-action.choice-active { box-shadow: inset 0 0 0 1px rgba(255,255,255,.14); }
+.pdf-screen.screen-refined .screen-content { padding-bottom: 20px; }
+.pdf-screen.screen-refined .screen-content > .u-text-_20px_ { font-size: 23px; line-height: 32px; }
+.pdf-screen.screen-refined .screen-content .u-rounded-2xl.u-border { border-color: rgba(188,213,207,.18); }
+.pdf-screen.screen-refined .legacy-action.u-flex { text-align: left; }
+.pdf-screen.screen-refined .u-grid .legacy-action { text-align: center; }
+.pdf-screen.screen-refined .u-divide-y > .legacy-action { width: 100%; min-height: 56px; }
+.pdf-screen.screen-refined .u-w-7.legacy-action { min-width: 36px; min-height: 36px; }
+.pdf-screen.screen-refined .u-empty-panel { line-height: 1.8; }
+.refined-note { display: block; padding: 12px 20px 0; color: var(--muted); font-size: 10px; line-height: 18px; text-align: center; }
+.pdf-screen[data-screen="9"] .u-choice-group { margin-top: 18px; gap: 8px; }
+.pdf-screen[data-screen="9"] .u-choice-group > .legacy-action { padding: 18px 3px 12px; min-height: 118px; border-radius: 15px; text-align: center; }
+.pdf-screen[data-screen="9"] .u-choice-group .u-text-_14px_ { font-size: 25px; line-height: 34px; }
+.pdf-screen[data-screen="9"] .u-choice-group .u-text-_9px_ { font-size: 10px; }
+.pdf-screen[data-screen="9"] .u-choice-group .u-text-sage { color: inherit; }
+.pdf-screen[data-screen="9"] .u-grid-cols-4:not(.u-choice-group) { gap: 20px 6px; }
+.pdf-screen[data-screen="10"] .u-text-_44px_ { font-size: 48px; letter-spacing: -1px; }
+.pdf-screen[data-screen="10"] .u-p-5 { padding: 22px 18px; }
+.pdf-screen[data-screen="11"] .u-h-_200px_ { height: 212px; }
+.pdf-screen[data-screen="11"] .u-bottom-3 .u-text-_15px_ { max-width: 230px; font-size: 17px; line-height: 25px; }
+.pdf-screen[data-screen="11"] .u-bottom-3.u-flex { gap: 12px; }
+.pdf-screen[data-screen="11"] .u-bottom-3 .legacy-action { flex-shrink: 0; }
+.pdf-screen[data-screen="12"] .u-divide-x .legacy-action { padding-top: 18px; padding-bottom: 18px; }
+.pdf-screen[data-screen="12"] .u-grid-cols-4 > .legacy-action { padding-top: 7px; padding-bottom: 7px; min-height: 64px; }
+.pdf-screen[data-screen="14"] .u-h-_92px_ { height: 112px; margin-top: 22px; }
+.pdf-screen[data-screen="14"] .u-grid-cols-3 .u-p-3 { padding: 14px 6px; }
+.pdf-screen[data-screen="15"] .u-choice-group { flex-wrap: nowrap; gap: 5px; }
+.pdf-screen[data-screen="15"] .u-choice-group > .legacy-action { padding: 6px 9px; font-size: 11px; flex: 1; justify-content: center; white-space: nowrap; }
+.pdf-screen[data-screen="16"] .u-py-2 { padding-top: 12px; padding-bottom: 12px; }
+.pdf-screen[data-screen="18"] .u-divide-y > view { gap: 10px; min-height: 68px; }
+.pdf-screen[data-screen="18"] switch { flex-shrink: 0; }
+.pdf-screen[data-screen="19"] .u-text-_34px_ { font-size: 40px; line-height: 46px; }
+.pdf-screen[data-screen="19"] .u-text-_9px_ { line-height: 19px; }
+.pdf-screen[data-screen="20"] .u-h-_200px_ { height: 216px; }
+.pdf-screen[data-screen="20"] .u-choice-group > .legacy-action { width: 100%; }
+.pdf-screen[data-screen="20"] .u-w-_86px_ { flex-shrink: 0; }
+.pdf-screen[data-screen="20"] .u-max-w-_280px_, .pdf-screen[data-screen="20"] .u-flex-1 { overflow-wrap: anywhere; }
+.pdf-screen[data-screen="21"] .u-choice-group, .pdf-screen[data-screen="22"] .u-choice-group { gap: 8px; }
+.pdf-screen[data-screen="21"] .u-space-y-2_5 > view { padding: 16px; }
+.pdf-screen[data-screen="22"] .u-truncate { white-space: normal; }
+/* Keep photograph overlays and chart bars intact when changing the paper theme. */
+.theme-paper .pdf-screen.screen-refined { color: #0E2A26; }
+.theme-paper .screen-refined .u-text-sage, .theme-paper .screen-refined .u-text-sage_70, .theme-paper .screen-refined .u-text-sage_60, .theme-paper .screen-refined .u-text-sage_50 { color: #52685C; }
+.theme-paper .screen-refined .u-rounded-2xl[class*="u-bg-gradient"], .theme-paper .screen-refined .u-bg-white_8, .theme-paper .screen-refined .u-bg-white_6 { background: #FFFFFF; color: #0E2A26; }
+.theme-paper .screen-refined [class*="u-text-mist"] { color: #0E2A26; }
+.theme-paper .screen-refined .u-text-gold { color: #8A622D; }
+.theme-paper .screen-refined .u-text-jade { color: #28776B; }
+.theme-paper .screen-refined .choice-active { background: #C4E0D3 !important; color: #0E2A26 !important; }
+.theme-paper .screen-refined .choice-passive { background: #EDF2ED !important; color: #52685C !important; border-color: #CFDCD3 !important; }
+.theme-paper .screen-refined .app-icon { filter: brightness(.58) saturate(.75); }
+.theme-paper .screen-refined .preserve-dark { color: #FFFFFF; }
+.theme-paper .screen-refined .preserve-dark .u-text-sage { color: #D8E6E0; }
+.theme-paper .screen-refined .preserve-dark .app-icon { filter: none; }
+.theme-paper .screen-refined .screen-status-icons { filter: brightness(.3); }
+.theme-paper .screen-refined .u-bg-black_60 { color: #FFFFFF; }
+@media (max-width:350px) {
+ .pdf-screen[data-screen="9"] .u-choice-group { grid-template-columns: repeat(2,minmax(0,1fr)); gap: 14px 10px; }
+ .pdf-screen[data-screen="11"] .u-bottom-3 .u-text-_15px_ { font-size: 15px; max-width: 185px; }
+ .pdf-screen[data-screen="15"] .u-choice-group { flex-wrap: wrap; }
+ .pdf-screen[data-screen="15"] .u-choice-group > .legacy-action { flex: initial; padding-left: 10px; padding-right: 10px; }
+ .pdf-screen[data-screen="19"] .u-gap-6 { gap: 18px; }
+ .pdf-screen[data-screen="21"] .u-justify-between.u-text-_10px_ { flex-wrap: wrap; gap: 6px 12px; }
+}
+@media (prefers-reduced-motion:reduce) { .pdf-screen.screen-refined .legacy-action { transition: none; } }
+
+.pdf-screen[data-screen="9"] .u-choice-group > .legacy-action { overflow: visible; }
+.pdf-screen[data-screen="11"] .live-reminder { text-align: center; }
+.pdf-screen.screen-refined[data-screen="12"] .legacy-action.profile-header { display: flex; text-align: left; }
+.pdf-screen[data-screen="18"] .theme-option { display:flex; align-items:center; justify-content:center; padding:10px 4px; }
+
+/* Text actions are not icon buttons: reserve their width and center the label.
+   Keep these opt-in so cards, setting rows and circular calendar controls retain
+   their own layout. A min-height alone leaves text at the top on both renderers. */
+.pdf-screen.screen-refined .legacy-action.action-label,
+.pdf-screen.screen-refined .legacy-action.action-tab,
+.pdf-screen.screen-refined .legacy-action.action-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  text-align: center;
+  line-height: 20px;
+}
+.pdf-screen.screen-refined .legacy-action.action-label {
+  min-width: 72px;
+  min-height: 44px;
+  padding: 10px 16px;
+  border-radius: 12px;
+  white-space: nowrap;
+}
+.pdf-screen.screen-refined .legacy-action.action-label.u-w-full {
+  display: flex;
+  min-width: 0;
+  min-height: 48px;
+  padding: 12px 16px;
+  border-radius: 16px;
+  white-space: normal;
+}
+.pdf-screen.screen-refined .legacy-action.action-tab {
+  min-width: 44px;
+  min-height: 44px;
+  padding: 8px 10px;
+  border-radius: 12px;
+  white-space: nowrap;
+}
+.pdf-screen.screen-refined .legacy-action.action-link { min-height: 44px; }
+.pdf-screen.screen-refined .legacy-action.action-label .app-icon,
+.pdf-screen.screen-refined .legacy-action.action-link .app-icon { align-self: center; }

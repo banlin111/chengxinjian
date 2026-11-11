@@ -6,3 +6,10 @@ node_modules/
 *.p12
 *.key
 research/
+dist/
+unpackage/
+test-results/
+playwright-report/
+*.log
+*.zip
+project.private.config.json

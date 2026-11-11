@@ -1,4 +1,4 @@
-import * as T from './models';
+import type * as T from './models';
 // q = query string; b = JSON body; r = success envelope data.
 // Absent q/b means no query/body. Path placeholders are required string IDs.
 type R<O> = { r: O };

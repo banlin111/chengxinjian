@@ -1,0 +1,95 @@
+/* Reading and touch refinements for the PDF pages; no motion in this phase. */
+.pdf-screen .u-text-_8px_ { font-size: 9px; }
+.pdf-screen .u-text-_9px_ { font-size: 10px; line-height: 1.6; }
+.pdf-screen .u-text-_10px_ { font-size: 11px; line-height: 1.6; }
+.pdf-screen .u-text-_11px_ { font-size: 12px; line-height: 1.6; }
+.pdf-screen .u-text-_12px_ { font-size: 13px; line-height: 1.6; }
+.pdf-screen .u-text-_13px_ { font-size: 14px; line-height: 1.5; }
+.pdf-screen .u-text-_15px_ { font-size: 16px; line-height: 1.5; }
+.pdf-screen .u-text-_16px_.u-font-bold { font-size: 17px; line-height: 1.5; }
+.pdf-screen .screen-content > .u-text-_20px_,
+.pdf-screen .screen-content > .u-text-_22px_ { font-size: 24px; line-height: 1.4; letter-spacing: .2px; }
+.pdf-screen .u-text-sage { color: #BCD5CF; }
+.pdf-screen .u-text-sage_70, .pdf-screen .u-text-sage_60 { color: #A8C5BD; }
+.pdf-screen .u-text-sage_50 { color: #91B5AC; }
+.pdf-screen .u-rounded-2xl.u-bg-white_8 { background-color: rgba(11,37,35,.28); }
+.pdf-screen .u-rounded-2xl.u-border { border-color: rgba(188,213,207,.16); }
+.pdf-screen .u-rounded-2xl.u-border-gold_30 { border-color: rgba(233,192,138,.32); }
+.pdf-screen .u-rounded-2xl.u-border-jade_40 { border-color: rgba(63,179,163,.4); }
+.pdf-screen .u-rounded-2xl.u-p-3 { padding: 14px; }
+.pdf-screen .u-rounded-2xl.u-p-3_5 { padding: 16px; }
+.pdf-screen .u-rounded-2xl.u-border { box-shadow: 0 6px 18px rgba(6,25,23,.08); }
+.pdf-screen .u-choice-group.u-flex { align-items: center; column-gap: 6px; row-gap: 8px; }
+.pdf-screen .u-choice-group.u-flex > .ui-action { display: inline-flex; align-items: center; justify-content: center; min-height: 34px; padding: 6px 13px; white-space: nowrap; font-size: 12px; line-height: 1.4; }
+.pdf-screen .choice-active { color: #0F2925 !important; background-color: #62C5B4 !important; border-color: #7DD8C8 !important; }
+.pdf-screen .choice-passive { color: #C5DCD5 !important; background-color: rgba(15,29,31,.16) !important; border-color: rgba(188,213,207,.2) !important; }
+.pdf-screen button.u-py-1, .pdf-screen button.u-py-1_5 { min-height: 32px; padding-top: 6px; padding-bottom: 6px; }
+.pdf-screen button.u-w-full.u-py-3_5, .pdf-screen button.u-w-full.u-py-4 { min-height: 48px; font-size: 14px; }
+.pdf-screen .screen-footer > view { gap: 10px; padding: 10px 12px; border-radius: 18px; background-color: #17312F; }
+.pdf-screen .screen-footer button { min-height: 44px; font-size: 13px; white-space: nowrap; }
+.pdf-screen .screen-footer .ui-action.u-flex-col { min-width: 30px; gap: 3px; }
+.pdf-screen .screen-footer .u-flex-col .app-icon { font-size: 19px; }
+.pdf-screen .u-text-right { flex-shrink: 0; }
+.pdf-screen .u-rounded-2xl.u-divide-y { overflow: hidden; }
+
+/* Learning lists: readable two-line titles, consistent thumbnail and row rhythm. */
+.pdf-screen[data-screen="2"] .u-truncate,
+.pdf-screen[data-screen="3"] .u-truncate,
+.pdf-screen[data-screen="11"] .u-truncate { white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; line-height: 1.5; }
+.pdf-screen[data-screen="2"] .u-grid-cols-4 { row-gap: 18px; }
+.pdf-screen[data-screen="2"] .u-grid-cols-4 .u-w-14 { width: 54px; height: 54px; border: 1px solid rgba(255,255,255,.12); }
+.pdf-screen[data-screen="3"] .u-w-_92px_ { width: 88px; height: 80px; }
+.pdf-screen[data-screen="3"] .u-space-y-3 > view { align-items: center; }
+.pdf-screen[data-screen="3"] .u-space-y-3 .u-mt-1_5 { margin-top: 8px; }
+.pdf-screen[data-screen="4"] .u-space-y-2 > .u-flex { padding: 14px 12px; border-radius: 12px; }
+.pdf-screen[data-screen="4"] .u-space-y-2 .u-w-7 { width: 32px; height: 32px; }
+.pdf-screen[data-screen="4"] .screen-footer .choice-active { background: transparent !important; color: #62C5B4 !important; }
+.pdf-screen[data-screen="11"] .u-w-_88px_ { width: 88px; height: 80px; }
+
+/* Commerce: give prices and selected plans a clearer hierarchy. */
+.pdf-screen[data-screen="7"] .u-grid-cols-2 .u-h-_110px_ { height: 128px; }
+.pdf-screen[data-screen="7"] .u-grid-cols-2 .u-p-2_5 { padding: 12px; }
+.pdf-screen[data-screen="7"] .u-grid-cols-2 .u-text-gold.u-font-bold { font-size: 18px; }
+.pdf-screen[data-screen="7"] .u-w-_110px_ { width: 124px; }
+.pdf-screen[data-screen="7"] .u-w-_110px_ .u-h-_80px_ { height: 90px; }
+.pdf-screen[data-screen="8"] .u-text-_26px_ { font-size: 30px; letter-spacing: -.5px; }
+.pdf-screen[data-screen="8"] .u-text-_17px_.u-font-bold { font-size: 19px; line-height: 1.5; }
+.pdf-screen[data-screen="8"] .u-gap-3.u-text-_10px_ { flex-wrap: wrap; gap: 8px 12px; }
+.pdf-screen[data-screen="9"] .u-choice-group { gap: 8px; margin-top: 18px; }
+.pdf-screen[data-screen="9"] .u-choice-group > view { min-height: 112px; padding: 17px 4px 12px; border-radius: 14px; }
+.pdf-screen[data-screen="9"] .u-choice-group .u-text-_14px_ { font-size: 22px; line-height: 1.4; }
+.pdf-screen[data-screen="9"] .u-choice-group .u-text-_12px_ { font-size: 12px; }
+.pdf-screen[data-screen="9"] .u-choice-group .u-text-_9px_ { font-size: 10px; }
+.pdf-screen[data-screen="9"] .u-grid-cols-4.u-gap-y-4 { row-gap: 22px; }
+
+/* Personal center and ledger rows follow a common spacing system. */
+.pdf-screen[data-screen="12"] .u-divide-y > view { min-height: 52px; padding-top: 14px; padding-bottom: 14px; }
+.pdf-screen[data-screen="12"] .u-divide-y .app-icon { font-size: 17px; }
+.pdf-screen[data-screen="12"] .u-divide-x .u-text-_17px_ { font-size: 23px; line-height: 1.35; }
+.pdf-screen[data-screen="12"] .u-divide-x .u-py-3_5 { padding-top: 18px; padding-bottom: 18px; }
+.pdf-screen[data-screen="18"] .u-divide-y > view { min-height: 60px; }
+.pdf-screen[data-screen="18"] switch { transform: scale(.85); transform-origin: right center; }
+.pdf-screen[data-screen="19"] .u-text-_34px_ { font-size: 38px; letter-spacing: -.8px; }
+.pdf-screen[data-screen="21"] .u-space-y-2_5 > view,
+.pdf-screen[data-screen="22"] .u-space-y-2_5 > view { padding: 16px 14px; }
+.pdf-screen[data-screen="22"] .u-truncate { white-space: normal; line-height: 1.5; }
+.pdf-screen[data-screen="22"] .u-text-_9px_ { font-size: 11px; line-height: 1.65; }
+.pdf-screen .u-search-field { min-height: 44px; }
+.pdf-screen .u-search-field input { font-size: 13px; }
+.pdf-screen .u-history-row { min-height: 50px; font-size: 13px; }
+.pdf-screen .u-history-row button:last-child { color: #BCD5CF; font-size: 18px; }
+.pdf-screen[data-screen="17"] .u-top-_58px_ { top: calc(var(--top) - 6px); }
+.pdf-screen[data-screen="17"] .u-top-_70px_ { top: calc(var(--top) + 6px); }
+.pdf-screen[data-screen="17"] .u-top-_128px_ { top: calc(var(--top) + 64px); }
+.pdf-screen[data-screen="17"] .u-top-_150px_ { top: calc(var(--top) + 86px); }
+
+@media (max-width: 350px) {
+  .pdf-screen .screen-content > .u-text-_20px_, .pdf-screen .screen-content > .u-text-_22px_ { font-size: 22px; }
+  .pdf-screen .u-choice-group.u-flex > .ui-action { padding-left: 10px; padding-right: 10px; font-size: 11px; }
+  .pdf-screen[data-screen="9"] .u-choice-group { grid-template-columns: repeat(2,minmax(0,1fr)); gap: 12px; }
+  .pdf-screen[data-screen="9"] .u-choice-group > view { min-height: 108px; }
+  .pdf-screen[data-screen="7"] .u-grid-cols-2 .u-h-_110px_ { height: 108px; }
+  .pdf-screen[data-screen="3"] .u-w-_92px_ { width: 72px; height: 80px; }
+  .pdf-screen .screen-footer > view { gap: 7px; padding: 9px; }
+  .pdf-screen .screen-footer button { font-size: 12px; }
+}

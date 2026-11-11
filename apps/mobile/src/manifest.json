@@ -1,0 +1,7 @@
+{
+  "name": "澄心涧", "appid": "", "description": "澄心涧前端工程",
+  "versionName": "0.1.0", "versionCode": "100", "transformPx": false,
+  "vueVersion": "3",
+  "mp-weixin": { "appid": "wxb0266d620c869247", "usingComponents": true, "mergeVirtualHostAttributes": true, "setting": { "urlCheck": true } },
+  "h5": { "router": { "mode": "hash" }, "title": "澄心涧" }
+}

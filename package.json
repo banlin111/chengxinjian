@@ -2,12 +2,18 @@
   "name": "chengxinjian-contracts",
   "private": true,
   "version": "0.1.0",
-  "description": "Documentation and API contracts only; not the application implementation",
+  "description": "Chengxinjian frontend and shared API contracts",
   "scripts": {
     "typecheck": "tsc --noEmit",
     "schema": "node -e \"require('fs').mkdirSync('research',{recursive:true})\" && typescript-json-schema tsconfig.json Api --required --noExtraProps --out research/api-schema.json",
     "docs": "python scripts/build_docs.py",
-    "check": "npm run typecheck && npm run schema && npm run docs"
+    "check": "npm run typecheck && npm run schema && npm run docs",
+    "dev:mobile": "npm --prefix apps/mobile run dev:h5",
+    "dev:weixin": "npm --prefix apps/mobile run dev:mp-weixin",
+    "build:mobile": "npm --prefix apps/mobile run build:h5",
+    "build:weixin": "npm --prefix apps/mobile run build:mp-weixin",
+    "check:mobile": "npm --prefix apps/mobile run check",
+    "test:mobile": "npm --prefix apps/mobile run test:e2e"
   },
   "devDependencies": {
     "typescript": "5.9.3",

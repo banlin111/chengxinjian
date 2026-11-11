@@ -1,0 +1,191 @@
+{
+  "pages": [
+    {
+      "path": "pages/home/index",
+      "style": {
+        "navigationBarTitleText": "首页推荐"
+      }
+    },
+    {
+      "path": "pages/meditation/index",
+      "style": {
+        "navigationBarTitleText": "冥想分类"
+      }
+    },
+    { "path": "pages/meditation-category/index", "style": { "navigationBarTitleText": "冥想分类列表" } },
+    { "path": "pages/meditation-detail/index", "style": { "navigationBarTitleText": "冥想详情" } },
+    {
+      "path": "pages/courses/index",
+      "style": {
+        "navigationBarTitleText": "课程库"
+      }
+    },
+    {
+      "path": "pages/course-detail/index",
+      "style": {
+        "navigationBarTitleText": "课程详情"
+      }
+    },
+    {
+      "path": "pages/player/index",
+      "style": {
+        "navigationBarTitleText": "沉浸播放器"
+      }
+    },
+    {
+      "path": "pages/mixer/index",
+      "style": {
+        "navigationBarTitleText": "白噪音混音"
+      }
+    },
+    {
+      "path": "pages/shop/index",
+      "style": {
+        "navigationBarTitleText": "商城首页"
+      }
+    },
+    {
+      "path": "pages/product/index",
+      "style": {
+        "navigationBarTitleText": "商品详情"
+      }
+    },
+    {
+      "path": "pages/membership/index",
+      "style": {
+        "navigationBarTitleText": "会员中心"
+      }
+    },
+    {
+      "path": "pages/practice/index",
+      "style": {
+        "navigationBarTitleText": "打卡练习"
+      }
+    },
+    {
+      "path": "pages/live/index",
+      "style": {
+        "navigationBarTitleText": "共修直播"
+      }
+    },
+    {
+      "path": "pages/profile/index",
+      "style": {
+        "navigationBarTitleText": "个人中心"
+      }
+    },
+    {
+      "path": "pages/search/index",
+      "style": {
+        "navigationBarTitleText": "搜索"
+      }
+    },
+    {
+      "path": "pages/report/index",
+      "style": {
+        "navigationBarTitleText": "静心报告"
+      }
+    },
+    {
+      "path": "pages/orders/index",
+      "style": {
+        "navigationBarTitleText": "订单物流"
+      }
+    },
+    {
+      "path": "pages/points/index",
+      "style": {
+        "navigationBarTitleText": "积分中心"
+      }
+    },
+    {
+      "path": "pages/live-room/index",
+      "style": {
+        "navigationBarTitleText": "直播间"
+      }
+    },
+    {
+      "path": "pages/settings/index",
+      "style": {
+        "navigationBarTitleText": "设置"
+      }
+    },
+    {
+      "path": "pages/affiliate/index",
+      "style": {
+        "navigationBarTitleText": "分销中心"
+      }
+    },
+    {
+      "path": "pages/poster/index",
+      "style": {
+        "navigationBarTitleText": "推广海报"
+      }
+    },
+    {
+      "path": "pages/team/index",
+      "style": {
+        "navigationBarTitleText": "推广人员"
+      }
+    },
+    {
+      "path": "pages/commissions/index",
+      "style": {
+        "navigationBarTitleText": "佣金明细"
+      }
+    },
+    {
+      "path": "pages/gallery/index",
+      "style": {
+        "navigationBarTitleText": "页面目录"
+      }
+    }
+  ],
+  "globalStyle": {
+    "navigationStyle": "custom",
+    "backgroundColor": "#0F1D1F",
+    "backgroundColorContent": "#0F1D1F",
+    "navigationBarBackgroundColor": "#0F1D1F",
+    "backgroundColorTop": "#0F1D1F",
+    "backgroundColorBottom": "#0F1D1F",
+    "navigationBarTextStyle": "white"
+  },
+  "tabBar": {
+    "color": "#91A79B",
+    "selectedColor": "#57A184",
+    "backgroundColor": "#0B1712",
+    "borderStyle": "black",
+    "list": [
+      {
+        "pagePath": "pages/home/index",
+        "text": "推荐",
+        "iconPath": "static/tabs/forest-home.png",
+        "selectedIconPath": "static/tabs/forest-home-active.png"
+      },
+      {
+        "pagePath": "pages/meditation/index",
+        "text": "冥想",
+        "iconPath": "static/tabs/forest-meditation.png",
+        "selectedIconPath": "static/tabs/forest-meditation-active.png"
+      },
+      {
+        "pagePath": "pages/courses/index",
+        "text": "课程",
+        "iconPath": "static/tabs/forest-courses.png",
+        "selectedIconPath": "static/tabs/forest-courses-active.png"
+      },
+      {
+        "pagePath": "pages/practice/index",
+        "text": "练习",
+        "iconPath": "static/tabs/forest-practice.png",
+        "selectedIconPath": "static/tabs/forest-practice-active.png"
+      },
+      {
+        "pagePath": "pages/profile/index",
+        "text": "我的",
+        "iconPath": "static/tabs/forest-profile.png",
+        "selectedIconPath": "static/tabs/forest-profile-active.png"
+      }
+    ]
+  }
+}

@@ -6,6 +6,14 @@
 
 本文定义目标方案与接口，不代表应用已开发完成。尚无甲方答案的业务数字均需确认，原型中的价格、用户量、奖励及文案不能作为正式配置。本文、接口类型和 OpenAPI 均为同一版本的草案，双方确认后冻结。
 
+前端范围更新（2026年11月9日）：新增原型额外功能的演示占位，默认墨绿主题，底栏固定为“推荐、冥想、课程、练习、我的”。具体页面、交互、流程和验收见[页面与交互规格表](docs/页面与交互规格表.md)，执行步骤见[前端开发流程](docs/前端开发流程.md)。本次不变更生产API契约。页面外观直接还原甲方效果图，不另做全新视觉稿；点击与状态动画按[交互动效实现规范](docs/交互动效实现规范.md)实现。
+
+2026年11月10日交互确认：底栏切换后直接显示稳定页面，不播放整页浮现位移。冥想八宫格进入独立分类列表，再进入单条冥想详情，最后开始播放；“全部”和“更多”进入全部分类列表，热门音频进入详情。每类暂留一条演示内容，支持逐级返回。分类列表与引导详情是原型入口的补全页，沿用 PDF 的视觉语言，不冒充 PDF 已提供的独立画面。
+
+工程进度（2026年11月10日）：`apps/mobile` 使用 uni-app CLI + Vue 3，不需要 HBuilderX。按《澄心涧APP高保真原型v2(1).pdf》及同版本资源完成 S1–S22 页面精修、基础动效和跨页面演示联动，等待统一验收。当前默认松石夜色渐变，设置可切换墨绿/浅色宣纸；这项 PDF 配色选择优先于早期默认墨绿说明。启动与微信工具导入见[小程序开发说明](apps/mobile/README.md)，逐页范围、操作路径和验证结果见[前端统一验收清单](docs/前端统一验收清单.md)。
+
+当前前端通过 56 项浏览器用例、类型检查及 H5/微信构建。微信工具可生成扫码预览，安卓普通预览中的练习页白屏仍待排查。真实音视频、支付、账号和业务接口尚未完成联调。PDF 页面范围与业务实现进度见前端验收清单。
+
 ## 1. 阅读顺序与文件
 
 1. 甲方看第 2、3 节：准备资源并确认业务边界。
@@ -68,7 +76,7 @@ Apple Developer、App Store Connect 权限、Android 应用市场企业账号、
 - 思维导图是本期功能范围依据，用户已明确要求全部做；原文技术栈写的是“建议”：Flutter / React Native、Spring Boot / Node.js、MySQL + Redis、云直播、对象存储。
 - 原型 V1 有 30 屏；V2 两版各 22 屏，提取页面内容对比显示主要差别为颜色与风格描述。
 - 三套配色都实现；功能整合为一套。不能把三份原型做成三个独立应用。
-- 原型新增商城零售、购物车、积分货币、优惠券、二级分销、佣金提现、秒杀、礼物/连麦、离线下载、自动续费等，不因出现在图上就自动计入思维导图范围。**需甲方追加确认与估时**。
+- 原型新增商城零售、购物车、积分货币、优惠券、二级分销、佣金提现、秒杀、礼物/连麦、离线下载、自动续费等，**已于2026年11月9日纳入前端演示占位范围**：还原页面和交互，使用隔离的模拟数据，资金与权益动作不执行真实业务；不自动增加同事的后端任务。真实上线这些业务另行确认。
 - 思维导图已有的实物奖品、课程奖励、上传录制奖励及快递轨迹必须实现；无需为了奖品履约先做完整电商商城。
 - 未确定规则在测试环境可用明确标记的演示值，生产不得默认套用原型数字。
 
@@ -76,14 +84,14 @@ Apple Developer、App Store Connect 权限、Android 应用市场企业账号、
 
 | 问题 | 已发现的冲突/缺失 | 本契约处理 |
 | --- | --- | --- |
-| 三套主题 | V1 浅色、V2 松石夜色、V2 墨绿 | 全部实现；默认墨绿是建议，甲方可更改 |
-| 导航 | 原型不同页底栏不一致 | 建议统一：首页、课程、练习、直播、我的；冥想在练习中；不为未确认商城留正式主入口 |
+| 三套主题 | V1 浅色、V2 松石夜色、V2 墨绿 | 全部实现；用户已确认默认墨绿 |
+| 导航 | 原型不同页底栏不一致 | 用户已确认按V2首页图固定为：推荐、冥想、课程、练习、我的；商城和直播从推荐页快捷入口进入，商城另在我的保留入口 |
 | 会员定价 | 月卡 25/28 元；终身会员与连续包年混用 | 本期月/季/年/终身四档，一次购买；自动续费另确认 |
 | 会员时长 | 日数还是自然月未给出 | 每个套餐配置 durationDays；终身 expiresAt=null 且 lifetime=true；不凭空写死 30/90/365 |
 | 课程权益 | 会员免费与单课买断并存 | 支持 free/member/purchase/member_or_purchase；首节/限时试听逐节设置 |
 | 永久权益 | “一次解锁终身”未定义停服/下架 | 甲方写清服务存续、内容下架和退款安排；技术上使用无到期时间授权 |
 | 打卡 | V1 10 分钟、V2 21 分钟；连续天数不一致 | 后端配置阈值；上海时区自然日；不自动补签；跨日、断签按第 8 节建议确认 |
-| 奖励 | 7/21/30/49/100 天及积分数字混杂 | 以 reward-rules 正式配置为准；本期仅实物和课程奖励，不默认增加积分钱包 |
+| 奖励 | 7/21/30/49/100 天及积分数字混杂 | 真实业务以 reward-rules 正式配置为准，包含实物和课程奖励；积分页面以演示占位实现，与真实奖励隔离 |
 | 录制 | 思维导图为冥想过程，原型写心得 | 录音/视频形式、时长上限、审核、隐私范围需甲方确定；接口两种媒体都能接入 |
 | 退款 | 是否已学习/已使用会员可退，未规定 | 后端按批准政策校验；首版接口全额退款；部分退款如需另扩展；Apple 订单单独处理 |
 | 奖品履约 | 库存、发货时限、地区、运费未知 | 建议包邮且显式确认地址后领取；禁止静默使用旧默认地址发货 |
@@ -109,7 +117,7 @@ Apple Developer、App Store Connect 权限、Android 应用市场企业账号、
 | 部分 | 选择 | 理由与边界 |
 | --- | --- | --- |
 | 用户端 | uni-app + Vue 3 + TypeScript + Pinia | 先微信小程序，后续复用部分 APP 页面与业务；平台差异仍需适配 |
-| 小程序工具 | HBuilderX + 微信开发者工具 | HBuilderX 编译，微信工具调试及上传；CLI 也可使用 |
+| 小程序工具 | uni-app CLI + 微信开发者工具 | CLI 编译，微信工具调试及上传；本项目不使用 HBuilderX |
 | 管理后台 | Vue 3 + TypeScript + Vite + Element Plus | 普通 Web 管理后台，单独构建和部署 |
 | 后端 | Java 21 + Spring Boot + Spring Security + Bean Validation | 用户已确认 Java；建议先用团队熟悉且兼容的 Spring Boot 3.5 线，开工锁定补丁版；不无条件追最新大版本 |
 | 数据 | MySQL + Redis；Flyway 数据库迁移 | MySQL 为账务和权益事实来源；Redis 处理缓存、限流、短期会话 |
@@ -117,25 +125,26 @@ Apple Developer、App Store Connect 权限、Android 应用市场企业账号、
 | 架构 | 模块化单体 + 后台任务 + 事务 outbox | 两人开发优先减少服务运维数量，不从微服务/Kubernetes 起步 |
 | 契约 | 本 README + TypeScript DTO + OpenAPI 3.0 | 两人共用一份接口；Java DTO 由对应 JSON schema 落地 |
 
-[Spring Boot 官方系统要求](https://docs.spring.io/spring-boot/3.5/system-requirements.html)与[DCloud 快速上手](https://uniapp.dcloud.net.cn/quickstart.html)已查阅。确切版本和 lockfile 在建立实际工程时提交；本目录只含文档及契约，并没有伪装成已可运行的小程序。
+[Spring Boot 官方系统要求](https://docs.spring.io/spring-boot/3.5/system-requirements.html)与[DCloud 快速上手](https://uniapp.dcloud.net.cn/quickstart.html)已查阅。小程序依赖和锁文件已写入 apps/mobile；当前实现范围与待办以小程序开发说明为准。
 
 ### 4.3 创建与运行小程序
 
-可选 HBuilderX“新建项目 → uni-app → Vue 3”，或使用官方 `dcloudio/uni-preset-vue` 的 `vite-ts` 分支。确认所有 `@dcloudio/*` 编译包版本匹配，提交锁文件。
+工程已建立在 `apps/mobile`，采用官方 CLI 模板的 Vue 3 + TypeScript 依赖组合，不需要重新克隆模板，也不使用 HBuilderX。
 
 ```powershell
-# 以下是正式开发工程建立时的步骤，不表示本目录已有 apps/mobile
-git clone --branch vite-ts --single-branch https://github.com/dcloudio/uni-preset-vue.git apps/mobile
-cd apps/mobile
-npm install
-npm run dev:mp-weixin
-# 将 dist/dev/mp-weixin 导入微信开发者工具
-# 在 manifest.json 的 mp-weixin.appid 配置甲方小程序 AppID
-npm run build:mp-weixin
-# 上传构建产物 dist/build/mp-weixin，完成体验版、提审、发布
+# 仓库根目录
+npm --prefix apps/mobile ci
+npm run dev:mobile
+# 浏览器预览 http://localhost:5173
+
+# 另开终端，编译并监听小程序修改
+npm run dev:weixin
+# 将 apps/mobile/dist/dev/mp-weixin 导入微信开发者工具
+npm run build:weixin
+# 发布产物 apps/mobile/dist/build/mp-weixin
 ```
 
-HBuilderX 可视化创建工程的默认编译目录通常是 `unpackage/dist/dev/mp-weixin`，不要和 CLI 工程的 `dist/dev/mp-weixin` 混用。开启微信开发者工具服务端口便于 IDE 拉起。真机验收必须关闭“跳过域名校验”，不能仅凭模拟器正常判断上线可用。
+已配置甲方小程序 AppID；扫码预览与上传仍需登录拥有该小程序开发权限的微信。AppSecret 不进入前端，云平台密钥由后端独立保存。具体配置、验证边界和当前进度见[小程序开发说明](apps/mobile/README.md)。
 
 ## 5. 两人任务划分
 
@@ -370,7 +379,7 @@ join 同时校验账号、会员、直播状态，返回短效播放 URL、一�
 
 管理内容资源使用严格枚举：courses、lessons、meditations、noises、categories、teachers、membership-plans、mix-presets、reward-rules、notices；每种资源都有列表、详情、新增、全量修改、删除/归档五种接口，输入输出由 ContentMap 一一对应，不是任意 JSON 的通用表单接口。
 
-本次合同不包含原型额外商城/分销接口，后续确认时新增契约版本。APP 支付/平台账号在 APP 开发里程碑扩展，不把支付宝伪装成微信小程序的支付接口。
+本次API契约不包含原型额外商城/分销的生产接口；其前端页面现已纳入演示占位范围，见[页面与交互规格表](docs/页面与交互规格表.md)。后续接真实业务时再扩展契约。APP 支付/平台账号在 APP 开发里程碑扩展，不把支付宝伪装成微信小程序的支付接口。
 
 <!-- GENERATED_CONTRACTS -->
 
