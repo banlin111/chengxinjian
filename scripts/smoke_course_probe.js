@@ -50,7 +50,7 @@ async function exerciseCourse(fixtureCategory, expectedCourse, expectedLesson, e
     const result = await new Promise((resolve, reject) => wx.downloadFile({url:renewal.url,success:resolve,fail:()=>reject(Error('COS_DOWNLOAD_FAILED'))}))
     downloaded = result.tempFilePath
     if (result.statusCode !== 200) throw Error('COS_FETCH_FAILED')
-    localVideo = wx.env.USER_DATA_PATH + '/cxj-probe-video.mp4'
+    localVideo = wx.env.USER_DATA_PATH + '/cxj-probe-' + ticket.playbackId + '.mp4'
     await new Promise((resolve,reject)=>wx.getFileSystemManager().copyFile({srcPath:downloaded,destPath:localVideo,success:resolve,fail:()=>reject(Error('FIXTURE_COPY_FAILED'))}))
     const events = '/playbacks/' + ticket.playbackId + '/events'
     const start = await call(events,'POST',{eventId:key(),sequence:1,kind:'seek',positionSeconds:0,

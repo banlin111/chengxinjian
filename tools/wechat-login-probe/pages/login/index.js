@@ -15,7 +15,8 @@ Page({
   data: { busy: false, loggedIn: false, consented: false, backendPort: 18080, mediaStatus: '', mediaAssetId: '', status: '请先确认后端 readiness=UP，并在开发者工具本地设置中关闭域名校验。' },
   // Only the locally downloaded synthetic fixture enters page data. Signed URLs stay in probe memory.
   playVideoFixture(localFile) {
-    if (this.fixtureRun || localFile !== wx.env.USER_DATA_PATH + '/cxj-probe-video.mp4') {
+    const prefix = wx.env.USER_DATA_PATH + '/cxj-probe-'
+    if (this.fixtureRun || !localFile.startsWith(prefix) || !/^[a-f0-9-]{36}\.mp4$/.test(localFile.slice(prefix.length))) {
       return Promise.reject(Error('INVALID_FIXTURE'))
     }
     return new Promise((resolve, reject) => {
@@ -24,13 +25,14 @@ Page({
         if (!run) return
         clearTimeout(run.timer)
         this.fixtureRun = null
-        this.setData({ fixtureFile: '' })
-        if (error) reject(Error(error))
-        else resolve({ played: run.played, duration: run.duration, lastTime: run.lastTime })
+        this.setData({ fixtureFile: '' }, () => {
+          if (error) reject(Error(error))
+          else resolve({ played: run.played, duration: run.duration, lastTime: run.lastTime })
+        })
       }
       this.fixtureRun = { finish, played: false, duration: 0, lastTime: 0,
-        timer: setTimeout(() => finish('VIDEO_FIXTURE_TIMEOUT'), 15000) }
-      this.setData({ fixtureFile: localFile }, () => wx.createVideoContext('fixture-video', this).play())
+        timer: setTimeout(() => finish(this.fixtureRun.played ? 'VIDEO_END_TIMEOUT' : 'VIDEO_START_TIMEOUT'), 20000) }
+      this.setData({ fixtureFile: localFile })
     })
   },
   fixturePlayed() { if (this.fixtureRun) this.fixtureRun.played = true },
