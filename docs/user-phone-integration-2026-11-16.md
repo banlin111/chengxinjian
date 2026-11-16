@@ -71,4 +71,4 @@ GitHub Actions 的 backend 和 contracts 两项均在实现提交 2563fa6 上成
 
 验证码控制台已创建“澄心涧手机号绑定与换绑”，客户端为小程序、场景为短信、验证类型为滑动拼图。免费体验包实到 20,000 次，控制台显示 2026-11-16 至 2026-11-23，超量或到期自动停服。小程序前端须使用腾讯验证码 V2 系列插件，按 verify 回调取得 ticket。开发机已私密配置验证码应用参数及选用的短信 SDKAppID。本次未在微信真机生成插件票据，也未验收短信送达。云端账户开通和资源信息以本节为准。
 
-CAM 已建立独立策略 CXJPhoneVerificationDev，仅含 sms:SendSms 与 captcha:DescribeCaptchaMiniResult 两个操作。已有存储开发身份继续只用于 COS。新调用身份和服务端密钥的配置需在控制台完成创建用户安全验证后核验。
+CAM 已建立独立策略 CXJPhoneVerificationDev，仅含 sms:SendSms 与 captcha:DescribeCaptchaMiniResult 两个操作。已有存储开发身份继续只用于 COS。账号持有人在 Safari 完成安全验证后，已创建仅编程访问的开发子用户 cxj-phone-dev，仅关联该策略。后端开发机私有配置已写入服务端凭据并回读验证，权限 0600，临时下载文件已移除。已使用新凭据通过腾讯云 STS GetCallerIdentity 核对主账号、子用户及 CAMUser 类型。未调用短信发送，未做真实小程序票据校验，隔离云机未部署此开发凭据。
