@@ -29,6 +29,24 @@ async function verify() {
         const cover = document.querySelector('#home-hero-cover .hero-image img');
         return cover && cover.src === url && cover.complete && cover.naturalWidth > 0;
       }, fixture.coverUrl);
+      // Record what the colleague's actual build does. These are observations, not pass criteria for unfinished pages.
+      const badge = (await page.locator('#home-hero-cover .vip').allTextContents()).join('').trim();
+      const apiPaths = [];
+      page.on('request', request => {
+        const url = new URL(request.url());
+        if (url.origin === 'http://127.0.0.1:18082') apiPaths.push(url.pathname);
+      });
+      const origin = 'http://127.0.0.1:17173/';
+      await page.goto(origin + '#/pages/courses/index');
+      await page.locator('.featured-course').waitFor();
+      const listCalls = apiPaths.filter(p => p === '/api/v1/courses').length;
+      await page.goto(origin + '#/pages/course-detail/index?courseId=' + encodeURIComponent(courseId));
+      await page.locator('.course-hero-image,.page-title').first().waitFor();
+      const missing = await page.getByText('暂时找不到这门课程', {exact:true}).isVisible();
+      console.log(JSON.stringify({ policy:fixture.accessPolicy, displaysVip:badge.includes('VIP'),
+        listCalledApi:listCalls > 0, detailCalledApi:apiPaths.includes('/api/v1/courses/' + courseId),
+        realDetailShowsMissing:missing }));
+
     } else {
       assert.equal(phase, 'withdrawn');
       assert.equal(fixture, undefined);

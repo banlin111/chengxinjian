@@ -135,7 +135,11 @@ public class CourseCatalog {
         var access=entitlements.access(user,course,r.getString("access_policy"),r.getInt("available_trial"));
         result.set("access",json.valueToTree(access));
         if (user!=null) jdbc.query("SELECT position_seconds,completed FROM lesson_progress WHERE user_id=? AND lesson_id=? AND asset_id=?",
-            (org.springframework.jdbc.core.RowCallbackHandler)row->{result.put("resumeSeconds",row.getInt(1)); result.put("completed",row.getBoolean(2));},user.id(),id,r.getString("asset_id"));
+            (org.springframework.jdbc.core.RowCallbackHandler) row -> {
+                int position = row.getInt("position_seconds");
+                result.put("resumeSeconds", "trial".equals(access.reason()) ? Math.min(position, access.trialSeconds()) : position);
+                result.put("completed", row.getBoolean("completed"));
+            }, user.id(), id, r.getString("asset_id"));
         if (admin) result.put("assetId",r.getString("asset_id"));
         return result;
     }

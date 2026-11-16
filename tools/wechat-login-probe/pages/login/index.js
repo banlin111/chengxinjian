@@ -13,6 +13,34 @@ function request(path, method = 'GET', data, authenticated = false, extraHeaders
 }
 Page({
   data: { busy: false, loggedIn: false, consented: false, backendPort: 18080, mediaStatus: '', mediaAssetId: '', status: '请先确认后端 readiness=UP，并在开发者工具本地设置中关闭域名校验。' },
+  // Only the locally downloaded synthetic fixture enters page data. Signed URLs stay in probe memory.
+  playVideoFixture(localFile) {
+    if (this.fixtureRun || localFile !== wx.env.USER_DATA_PATH + '/cxj-probe-video.mp4') {
+      return Promise.reject(Error('INVALID_FIXTURE'))
+    }
+    return new Promise((resolve, reject) => {
+      const finish = (error) => {
+        const run = this.fixtureRun
+        if (!run) return
+        clearTimeout(run.timer)
+        this.fixtureRun = null
+        this.setData({ fixtureFile: '' })
+        if (error) reject(Error(error))
+        else resolve({ played: run.played, duration: run.duration, lastTime: run.lastTime })
+      }
+      this.fixtureRun = { finish, played: false, duration: 0, lastTime: 0,
+        timer: setTimeout(() => finish('VIDEO_FIXTURE_TIMEOUT'), 15000) }
+      this.setData({ fixtureFile: localFile }, () => wx.createVideoContext('fixture-video', this).play())
+    })
+  },
+  fixturePlayed() { if (this.fixtureRun) this.fixtureRun.played = true },
+  fixtureTime(e) {
+    if (!this.fixtureRun) return
+    this.fixtureRun.duration = e.detail.duration
+    this.fixtureRun.lastTime = Math.max(this.fixtureRun.lastTime, e.detail.currentTime)
+  },
+  fixtureEnded() { if (this.fixtureRun) this.fixtureRun.finish() },
+  fixtureFailed() { if (this.fixtureRun) this.fixtureRun.finish('VIDEO_FIXTURE_DECODE_FAILED') },
   setBackendPort(port) {
     if (tokens || ![18080, 18083].includes(port)) throw new Error('LOCAL_TEST_PORT_REQUIRED')
     BASE = 'http://127.0.0.1:' + port + '/api/v1'

@@ -283,20 +283,55 @@ def main():
                 return reply['data']
             check('IDE automator verified', ide('start').get('verified') is True)
             check('isolated probe page verified', ide('page_data',expected_path='pages/login/index')['path']=='pages/login/index')
-            def playback(reason, seconds):
-                probe = ide('evaluate',fn_source=(ROOT/'scripts/smoke_course_probe.js').read_text(),args_json=json.dumps([course['id'],lesson['id'],reason,seconds]))['result']
-                check('IDE wx.login, '+reason+' COS download, seek and renewal',probe['reason']==reason and probe['seconds']==seconds
-                      and probe['downloadStatus']==200 and probe['creditedSeconds']==0)
+            def playback(reason, seconds, previous_full=None):
+                # A full playback can outlast a single IDE evaluate RPC. Start once, then poll for its result.
+                exercise = (ROOT / 'scripts/smoke_course_probe.js').read_text()
+                start = """function(...args) {
+                    const page = getCurrentPages().slice(-1)[0];
+                    if (page.courseProbePending) return false;
+                    page.courseProbeResult = null;
+                    page.courseProbePending = true;
+                    (EXERCISE)(...args).then(value => { page.courseProbeResult = value; },
+                        () => { page.courseProbeResult = {failedCheck:'PROBE_CLEANUP_FAILED'}; })
+                        .finally(() => { page.courseProbePending = false; });
+                    return true;
+                }""".replace('EXERCISE', exercise)
+                args = [category['id'], course['id'], lesson['id'], reason, seconds, previous_full]
+                if not ide('evaluate', fn_source=start, args_json=json.dumps(args))['result']:
+                    raise RuntimeError('Another course probe is running')
+                poll = """function() {
+                    const page = getCurrentPages().slice(-1)[0];
+                    if (page.courseProbePending) return null;
+                    const result = page.courseProbeResult;
+                    delete page.courseProbeResult;
+                    return result;
+                }"""
+                deadline = time.monotonic() + 70
+                while time.monotonic() < deadline:
+                    probe = ide('evaluate', fn_source=poll).get('result')
+                    if probe:
+                        break
+                    time.sleep(0.5)
+                else:
+                    raise RuntimeError('Course playback probe timed out')
+                if probe.get('failedCheck'):
+                    raise RuntimeError('Course probe check failed: ' + probe['failedCheck'])
+                check('IDE wx.login, course list/detail/directory, '+reason+' COS download and renewal',probe['reason']==reason and probe['seconds']==seconds
+                      and probe['downloadStatus']==200 and probe['nativeDuration']==seconds and probe['lastTime']>0)
                 check('IDE '+reason+' learning, favorites, likes and cross-session resume', probe.get('libraryVerified') is True and probe.get('crossSessionVerified') is True)
-                return str(uuid.UUID(probe['userId']))
+                report.setdefault('native_playback', []).append({key: probe[key] for key in
+                    ('reason', 'seconds', 'resumeSeconds', 'nativeDuration', 'lastTime', 'creditedSeconds', 'completed')})
+                check('IDE video ended, event retry and restored position: '+reason, probe['crossSessionVerified'])
+                return str(uuid.UUID(probe['userId'])), str(uuid.UUID(probe['playbackId']))
 
-            uid = playback('trial',1)
+            uid, _ = playback('trial',1)
             token = admin_token
             grant = api('POST','/admin/users/'+uid+'/grants',dict(kind='course',targetId=course['id'],lifetime=True,reason='synthetic course entitlement'),str(uuid.uuid4()))
             grants.append(str(uuid.UUID(grant['id'])))
-            check('same WeChat user with manual course entitlement',playback('purchased',4)==uid)
+            full_user, full_playback = playback('purchased',4)
+            check('same WeChat user with manual course entitlement',full_user==uid)
             api('POST','/admin/grants/'+grant['id']+'/revoke',dict(reason='end synthetic grant'),str(uuid.uuid4()))
-            check('revoked grant falls back to isolated trial',playback('trial',1)==uid)
+            check('revoked grant falls back to isolated trial',playback('trial',1,full_playback)[0]==uid)
             review(cover,'reject')
             check('withdrawn image no longer delivered', requests.get(cover['publicUrl'],timeout=5).status_code==404)
             token = None

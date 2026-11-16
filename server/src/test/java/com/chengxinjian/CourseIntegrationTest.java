@@ -168,6 +168,22 @@ class CourseIntegrationTest {
         jdbc.update("INSERT INTO entitlement_grant(id,user_id,kind,target_id,course_id,source,source_id,starts_at,expires_at) VALUES (?,?,?,?,?,'admin',?,?,?)",
             id(),uid,kind,c==null?"plan":c,c,id(),Timestamp.from(Instant.now().minusSeconds(60)),expiry==null?null:Timestamp.from(expiry));
     }
+    @Test void directoryResumeUsesCurrentTrialWindowAfterRevocation() throws Exception {
+        String courseId=create("courses",course("purchase")).get("id").asText();
+        String lessonId=create("lessons",lesson(courseId,5)).get("id").asText();
+        jdbc.update("UPDATE lesson_trial SET state='ready',object_key='trials/test' WHERE asset_id=?",audio);
+        grant("course",courseId,null);
+        String full=play(lessonId,id(),200).get("playbackId").asText();
+        http(post(PLAY+"/"+full+"/events").header("Idempotency-Key",id()),user,
+            Map.of("eventId",id(),"sequence",1,"kind","seek","positionSeconds",24,
+                "playedDeltaSeconds",0,"speed",1,"occurredAt",Instant.now().toString()),200);
+        jdbc.update("UPDATE entitlement_grant SET revoked_at=CURRENT_TIMESTAMP WHERE user_id=?",uid);
+        var trial=play(lessonId,id(),200);
+        var directory=http(get("/api/v1/courses/"+courseId+"/lessons"),user,null,200);
+        assertThat(trial.path("resumeSeconds").asInt()).isEqualTo(5);
+        assertThat(directory.at("/items/0/resumeSeconds")).isEqualTo(trial.get("resumeSeconds"));
+        assertThat(http(get("/api/v1/me/learning"),user,null,200).at("/items/0/positionSeconds").asInt()).isEqualTo(24);
+    }
     @Test void trialOnlySignsDerivedKeyAndRevocationAlsoBlocksRenewal() throws Exception {
         String c=create("courses",course("member")).get("id").asText(),l=create("lessons",lesson(c,5)).get("id").asText();
         play(l,id(),403);
