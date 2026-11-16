@@ -85,6 +85,26 @@ class CourseIntegrationTest {
     JsonNode play(String lesson,String key,int expected) throws Exception {
         return http(post(PLAY).header("Idempotency-Key",key),user,Map.of("target",Map.of("kind","lesson","id",lesson),"platform","wechat_ios"),expected);
     }
+    @Test void homeFeedsMobileCardsWithoutExposingHiddenContent() throws Exception {
+        String home="/api/v1/home";
+        var empty=http(get(home),null,null,200);
+        assertThat(empty.path("recommendedCourses").isEmpty()).isTrue();
+        assertThat(empty.path("continueLearning").isNull()).isTrue();
+        var older=create("courses",course("free").put("title","早课")).path("id").asText();
+        var newer=create("courses",course("purchase").put("title","新课")).path("id").asText();
+        create("courses",course("free").put("status","draft"));
+        var data=http(get(home),null,null,200);
+        assertThat(data.path("recommendedCourses").size()).isEqualTo(1);
+        assertThat(data.at("/recommendedCourses/0/id").asText()).isEqualTo(newer);
+        assertThat(data.at("/recommendedCourses/0/access/allowed").asBoolean()).isFalse();
+        assertThat(data.path("newCourses").size()).isEqualTo(1);
+        assertThat(data.at("/newCourses/0/id").asText()).isEqualTo(older);
+        jdbc.update("UPDATE media_asset SET review_status='rejected' WHERE id=?",cover);
+        assertThat(http(get(home),null,null,200).path("recommendedCourses").size()).isZero();
+        http(get(home),"invalid-ticket",null,401);
+        http(get(home),admin,null,403);
+    }
+
     @Test void catalogProjectsPublishedLessonsAndEnforcesParentReferences() throws Exception {
         String c=create("courses",course("free")).get("id").asText();
         create("lessons",lesson(c,0)); create("lessons",lesson(c,0).put("status","draft"));
@@ -256,6 +276,8 @@ class CourseIntegrationTest {
         var list=http(get("/api/v1/me/learning").param("state","in_progress"),nextSession,null,200);
         assertThat(list.get("total").asInt()).isEqualTo(1);assertThat(list.at("/items/0/positionSeconds").asInt()).isEqualTo(10);
         assertThat(list.at("/items/0/progressPercent").asInt()).isEqualTo(16);assertThat(list.toString()).doesNotContain("validated/","object_key","url");
+        assertThat(http(get("/api/v1/home"),nextSession,null,200).get("continueLearning")).isEqualTo(list.at("/items/0"));
+        assertThat(http(get("/api/v1/home"),null,null,200).get("continueLearning").isNull()).isTrue();
         assertThat(play(l,id(),200).get("resumeSeconds").asInt()).isEqualTo(10);
         assertThat(http(get("/api/v1/me/learning").param("state","completed"),user,null,200).get("total").asInt()).isZero();
         assertThat(http(get("/api/v1/me/learning").param("state","purchased"),user,null,200).get("total").asInt()).isEqualTo(1);
@@ -282,6 +304,7 @@ class CourseIntegrationTest {
         String replacement=asset(owner,"course_media","audio/mp4","approved",120);
         http(put(ADMIN+"lessons/"+l),admin,lesson(c,0).put("assetId",replacement).put("version",1),200);
         assertThat(http(get("/api/v1/me/learning"),user,null,200).get("total").asInt()).isZero();
+        assertThat(http(get("/api/v1/home"),user,null,200).get("continueLearning").isNull()).isTrue();
         assertThat(play(l,id(),200).get("resumeSeconds").asInt()).isZero();
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM lesson_progress WHERE user_id=?",Long.class,uid)).isEqualTo(1);
     }

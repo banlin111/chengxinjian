@@ -26,8 +26,9 @@ public class LearningLibrary {
     public record Like(@NotNull Boolean liked) {}
     private final JdbcTemplate jdbc; private final UserService users; private final CourseCatalog catalog;
     private final Clock clock; private final ObjectMapper json;
-    public LearningLibrary(JdbcTemplate jdbc,UserService users,CourseCatalog catalog,Clock clock,ObjectMapper json) {
-        this.jdbc=jdbc;this.users=users;this.catalog=catalog;this.clock=clock;this.json=json;
+    private final LearningHistory history;
+    public LearningLibrary(JdbcTemplate jdbc,UserService users,CourseCatalog catalog,Clock clock,ObjectMapper json,LearningHistory history) {
+        this.jdbc=jdbc;this.users=users;this.catalog=catalog;this.clock=clock;this.json=json;this.history=history;
     }
     private void kind(String kind) {
         if (!Set.of("course","lesson","meditation","replay").contains(kind)) throw BusinessException.invalid("内容类型无效");
@@ -85,25 +86,6 @@ public class LearningLibrary {
             @RequestParam(required=false) @Pattern(regexp="in_progress|completed|purchased") String state,
             @RequestParam(defaultValue="1") @Min(1) int page,@RequestParam(defaultValue="20") @Min(1) @Max(100) int pageSize) {
         users.requireActive(user.id(),false);
-        // History is backed by existing progress. Replaced assets cannot inherit the old file's position/completion.
-        String from=CourseCatalog.LESSON_FROM+" JOIN lesson_progress p ON p.lesson_id=l.id AND p.asset_id=l.asset_id WHERE p.user_id=? AND "+CourseCatalog.COURSE_VISIBLE+" AND "+CourseCatalog.LESSON_VISIBLE;
-        List<Object> args=new ArrayList<>(List.of(user.id()));
-        if("completed".equals(state)) from+=" AND p.completed=TRUE";
-        if("in_progress".equals(state)) from+=" AND p.completed=FALSE";
-        if("purchased".equals(state)) {
-            // This filter means active direct-course entitlement, including manual grants; never evidence of payment.
-            from+=" AND EXISTS (SELECT 1 FROM entitlement_grant g WHERE g.user_id=p.user_id AND g.kind='course' AND g.course_id=c.id AND g.revoked_at IS NULL AND g.starts_at<=? AND (g.expires_at IS NULL OR g.expires_at>?))";
-            var now=Timestamp.from(clock.instant());args.add(now);args.add(now);
-        }
-        long total=jdbc.queryForObject("SELECT COUNT(*)"+from,Long.class,args.toArray());args.add(pageSize);args.add(((long)page-1)*pageSize);
-        var items=jdbc.query("SELECT l.id,l.course_id,l.title,cover.public_url,a.duration_seconds,p.*"+from+" ORDER BY p.last_played_at DESC,l.id LIMIT ? OFFSET ?",(r,n)->{
-            int duration=r.getInt("duration_seconds");
-            var result=json.createObjectNode().put("title",r.getString("title")).put("coverUrl",r.getString("public_url"))
-                .put("courseId",r.getString("course_id")).put("lessonId",r.getString("lesson_id")).put("positionSeconds",r.getInt("position_seconds"))
-                .put("progressPercent",duration<=0?0:Math.min(100,100L*r.getInt("credited_seconds")/duration)).put("completed",r.getBoolean("completed"))
-                .put("lastPlayedAt",r.getTimestamp("last_played_at").toInstant().toString());
-            result.putObject("target").put("kind","lesson").put("id",r.getString("lesson_id"));return result;
-        },args.toArray());
-        return ApiResponse.ok(new Page<>(items,page,pageSize,total));
+        return ApiResponse.ok(history.page(user.id(),state,page,pageSize));
     }
 }

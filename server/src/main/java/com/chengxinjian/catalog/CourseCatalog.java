@@ -70,6 +70,10 @@ public class CourseCatalog {
         String order="duration_asc".equals(f.sort()) ? "COALESCE(totals.duration,0),c.id" : "c.created_at DESC,c.id";
         return page(COURSE_SELECT,COURSE_FROM+TOTALS,where,order,(r,n)->course(r,user,false),page,size);
     }
+    List<ObjectNode> newestVisible(UserPrincipal user, int limit) {
+        return jdbc.query(COURSE_SELECT + COURSE_FROM + TOTALS + " WHERE " + COURSE_VISIBLE
+                + " ORDER BY c.created_at DESC,c.id LIMIT ?", (row, index) -> course(row,user,false), limit);
+    }
     public ObjectNode course(String id,AdminPrincipal admin,UserPrincipal user) {
         return jdbc.query(COURSE_SELECT+COURSE_FROM+TOTALS+" WHERE c.id=?"+(admin==null ? " AND "+COURSE_VISIBLE : ""),
             (r,n)->{if(admin!=null) scope(admin,r.getString("teacher_id")); return course(r,user,admin!=null);},id)

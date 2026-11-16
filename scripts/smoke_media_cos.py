@@ -23,7 +23,11 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--run-real-cloud-upload', action='store_true', required=True)
     parser.add_argument('--course-probe', action='store_true', help='Exercise editorial media, a paid lesson and wx.login in the local IDE')
+    parser.add_argument('--mobile-project', type=Path,
+                        help='Also verify the compiled frontend in Chromium (requires --course-probe)')
     args = parser.parse_args()
+    if args.mobile_project and (not args.course_probe or not (args.mobile_project / 'dist/build/h5/index.html').is_file()):
+        parser.error('--mobile-project requires --course-probe and a built apps/mobile directory')
     logging.disable(logging.CRITICAL)
     import requests
     from qcloud_cos import CosConfig, CosS3Client
@@ -58,6 +62,8 @@ def main():
     env.update(DB_URL=test['TEST_DB_URL'], DB_USERNAME=test['TEST_DB_USERNAME'], DB_PASSWORD=test['TEST_DB_PASSWORD'],
                SPRING_PROFILES_ACTIVE='local,mysql', SERVER_PORT='18082', LOCAL_ADMIN_USERNAME=username,
                LOCAL_ADMIN_PASSWORD=password, LOCAL_CAPTCHA_TICKET=captcha)
+    if args.mobile_project:
+        env['ADMIN_ALLOWED_ORIGINS'] = 'http://127.0.0.1:17173'
     java = next((ROOT.parent / '.tools').glob('jdk-*/Contents/Home/bin/java'))
     jar = ROOT / 'server/target/server-0.1.0-SNAPSHOT.jar'
     report = {'checks': [], 'fixture_cleanup': False, 'test_database': 'cxj_test',
@@ -76,6 +82,28 @@ def main():
         if not condition:
             raise RuntimeError('Check failed: ' + name)
         report['checks'].append(name)
+
+    def verify_mobile(phase):
+        # Serve only the compiled public files. Never pass the private backend environment to frontend code.
+        browser_env = {key: os.environ[key] for key in
+                       ('PATH', 'HOME', 'TMPDIR', 'LANG', 'PLAYWRIGHT_CHROMIUM_EXECUTABLE') if key in os.environ}
+        # Bind synchronously: an occupied port must not result in testing an unrelated page.
+        from functools import partial
+        from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
+        from threading import Thread
+        directory = args.mobile_project / 'dist/build/h5'
+        handler = partial(SimpleHTTPRequestHandler, directory=str(directory))
+        with ThreadingHTTPServer(('127.0.0.1', 17173), handler) as httpd:
+            thread = Thread(target=httpd.serve_forever, daemon=True)
+            thread.start()
+            try:
+                subprocess.run(['node', str(ROOT / 'scripts/smoke_mobile_home.cjs'),
+                                str(args.mobile_project.resolve()), course_fixture['courses'], phase],
+                               check=True, timeout=60, env=browser_env)
+            finally:
+                httpd.shutdown()
+                thread.join()
+        check('frontend H5 rendered actual homepage: ' + phase, True)
 
     def api(method, path, data=None, key=None, expected=200):
         headers = {}
@@ -235,6 +263,8 @@ def main():
             else:
                 raise RuntimeError('Trial encoding did not finish')
             check('public directory excludes private asset', 'assetId' not in directory['items'][0])
+            if args.mobile_project:
+                verify_mobile('visible')
             # Independently decode the private derivative and inspect the decoded FFmpeg output clock.
             trial = evidence / 'derived.mp4'
             client.get_object(Bucket=cloud['STORAGE_BUCKET'],Key=derived_keys[0])['Body'].get_stream_to_file(str(trial))
@@ -271,6 +301,8 @@ def main():
             check('withdrawn image no longer delivered', requests.get(cover['publicUrl'],timeout=5).status_code==404)
             token = None
             api('GET','/courses/'+course['id'],expected=404)
+            if args.mobile_project:
+                verify_mobile('withdrawn')
             token = admin_token
 
         result, _ = upload('wrong-hash.png', 'avatar', 'image/png', image, 'a' * 64)
