@@ -26,10 +26,15 @@ public class UserService {
     }
     public User profile(String id) {
         requireActive(id,false);
-        return jdbc.queryForObject("SELECT nickname,status FROM app_user WHERE id=?",(rs,n)->new User(id,rs.getString("nickname"),null,null,false,
-            roles(id),rs.getString("status"),entitlements.membership(id),settings(id).theme()),id);
+        return accountProfile(id);
     }
-    private List<String> roles(String id) {
+    User accountProfile(String id) {
+        return jdbc.queryForObject("SELECT nickname,status,phone,teacher_role FROM app_user WHERE id=?",(rs,n)->new User(id,rs.getString("nickname"),null,mask(rs.getString("phone")),false,
+            roles(id,rs.getBoolean("teacher_role")),rs.getString("status"),entitlements.membership(id),settings(id).theme()),id);
+    }
+    static String mask(String phone) { return phone==null ? null : phone.substring(0,3)+"****"+phone.substring(7); }
+    private List<String> roles(String id, boolean assigned) {
+        if (assigned) return List.of("user","teacher");
         long linked=jdbc.queryForObject("SELECT COUNT(*) FROM content_teacher WHERE user_id=? AND status<>'archived'",Long.class,id);
         return linked>0 ? List.of("user","teacher") : List.of("user");
     }

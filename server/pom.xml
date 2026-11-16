@@ -19,6 +19,7 @@
   </properties>
   <dependencies>
     <dependency><groupId>com.qcloud</groupId><artifactId>cos_api</artifactId><version>5.6.283</version></dependency>
+    <dependency><groupId>com.tencentcloudapi</groupId><artifactId>tencentcloud-sdk-java-sms</artifactId><version>3.2.6</version></dependency>
     <dependency><groupId>com.tencentcloudapi</groupId><artifactId>tencentcloud-sdk-java-sts</artifactId><version>3.2.6</version></dependency>
     <dependency><groupId>com.tencentcloudapi</groupId><artifactId>tencentcloud-sdk-java-captcha</artifactId><version>3.2.6</version></dependency>
     <dependency><groupId>com.twelvemonkeys.imageio</groupId><artifactId>imageio-webp</artifactId><version>3.15.3</version></dependency>

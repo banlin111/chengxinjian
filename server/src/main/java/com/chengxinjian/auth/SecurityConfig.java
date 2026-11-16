@@ -43,7 +43,7 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.POST,"/api/v1/uploads","/api/v1/uploads/*/complete").authenticated()
                 .requestMatchers(HttpMethod.GET,"/api/v1/assets/*").authenticated()
                 .requestMatchers("/api/v1/playbacks","/api/v1/playbacks/*/events","/api/v1/playbacks/*/renew").hasRole("USER")
-                .requestMatchers("/api/v1/me", "/api/v1/me/**", "/api/v1/auth/logout").hasRole("USER")
+                .requestMatchers("/api/v1/me", "/api/v1/me/**", "/api/v1/auth/logout", "/api/v1/auth/sms", "/api/v1/auth/reauth", "/api/v1/auth/reauth/wechat").hasRole("USER")
                 .anyRequest().denyAll())
             .exceptionHandling(c -> c
                 .authenticationEntryPoint((req,res,e) -> {

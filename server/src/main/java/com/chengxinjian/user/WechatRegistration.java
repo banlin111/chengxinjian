@@ -56,7 +56,8 @@ public class WechatRegistration {
         jdbc.update("UPDATE app_user SET last_login_at=? WHERE id=?",now,id);
         var tokens=sessions.create(id);
         audit.record(id,isNew ? "user.register" : "user.login",id,null);
-        return new LoginResult(tokens.accessToken(),tokens.refreshToken(),tokens.expiresIn(),tokens.refreshExpiresIn(),tokens.tokenType(),users.profile(id),isNew,true);
+        var profile=users.profile(id);
+        return new LoginResult(tokens.accessToken(),tokens.refreshToken(),tokens.expiresIn(),tokens.refreshExpiresIn(),tokens.tokenType(),profile,isNew,profile.phoneMasked()==null);
     }
     private static byte[] bytes(String value) { return value.getBytes(StandardCharsets.UTF_8); }
 }

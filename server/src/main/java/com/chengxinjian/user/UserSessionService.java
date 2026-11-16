@@ -35,13 +35,13 @@ public class UserSessionService {
         return t;
     }
     public UserPrincipal authenticate(String token) {
-        var rows=jdbc.queryForList("SELECT user_id,access_expires_at FROM user_auth_session WHERE access_hash=? AND audience='user' AND revoked=FALSE",TokenSecrets.hash(token));
+        var rows=jdbc.queryForList("SELECT id,user_id,access_expires_at FROM user_auth_session WHERE access_hash=? AND audience='user' AND revoked=FALSE",TokenSecrets.hash(token));
         if (rows.isEmpty()) { throw BusinessException.unauthenticated(); }
         var row=rows.getFirst();
         if (!((Timestamp)row.get("access_expires_at")).toInstant().isAfter(clock.instant())) {
             throw new BusinessException(HttpStatus.UNAUTHORIZED,"TOKEN_EXPIRED","登录已过期，请刷新会话");
         }
-        String id=(String)row.get("user_id"); users.requireActive(id,false); return new UserPrincipal(id);
+        String id=(String)row.get("user_id"); users.requireActive(id,false); return new UserPrincipal(id,(String)row.get("id"));
     }
     @Transactional
     public Tokens refresh(String token) {

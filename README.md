@@ -6,9 +6,9 @@
 
 本文定义目标方案与接口，不代表应用已开发完成。尚无甲方答案的业务数字均需确认，原型中的价格、用户量、奖励及文案不能作为正式配置。本文、接口类型和 OpenAPI 均为同一版本的草案，双方确认后冻结。
 
-**后端当前覆盖 75 个契约方法与路径。** 已实现管理员和微信会话、分类、讲师、私有媒资、编辑审核、课程与课节、会员套餐和人工权益，以及课节播放授权、事件和恢复进度；新增管理员账号/角色/审计、学习历史和课程/课节收藏点赞。非 local 初始化与验证码适配、备份监测见[阶段六记录](docs/backend-stage6-2026-11-11.md)。当前契约包含 224 个方法与路径，其中播放本阶段仅支持 lesson。已验证的环境、素材和未验收项见[阶段五记录](docs/backend-stage5-2026-11-10.md)和[后端开发说明](docs/backend-development.md)。
+**后端当前覆盖 84 个契约方法与路径。** 已实现管理员和微信会话、分类、讲师、私有媒资、编辑审核、课程与课节、会员套餐和人工权益，以及课节播放授权、事件和恢复进度；新增管理员账号/角色/审计、学习历史和课程/课节收藏点赞。非 local 初始化与验证码适配、备份监测见[阶段六记录](docs/backend-stage6-2026-11-11.md)。当前契约包含 224 个方法与路径，其中播放本阶段仅支持 lesson。已验证的环境、素材和未验收项见[阶段五记录](docs/backend-stage5-2026-11-10.md)和[后端开发说明](docs/backend-development.md)。
 
-**协作接续（2026-11-16）：** 小程序首页真实数据接口和前端分支接入方式见[后端开发说明](docs/backend-development.md)。上一阶段实现见[阶段六记录](docs/backend-stage6-2026-11-11.md)；以下交接链接保留起点快照。 后端代码已推送至 `codex/backend-foundation`，见 [完整交接提示词](docs/handoff-prompt-2026-11-11.md) 和 [当前交接核验](docs/handoff-2026-11-11.md)。阶段五代码、自动测试、真实供应商/开发工具联调、隔离云机部署和 SSH 隧道核验的范围分别记录；公网 HTTPS、正式前端、微信真机及整体上线验收仍待完成。接口入口存在不代表对应模块已完整交付。
+**协作接续（2026-11-16）** 普通用户目录、禁用与启用、角色、手机号绑定与换绑的前端接口和供应商办理步骤见[账号联调交接](docs/user-phone-integration-2026-11-16.md)。 小程序首页真实数据接口和前端分支接入方式见[后端开发说明](docs/backend-development.md)。上一阶段实现见[阶段六记录](docs/backend-stage6-2026-11-11.md)；以下交接链接保留起点快照。 后端代码已推送至 `codex/backend-foundation`，见 [完整交接提示词](docs/handoff-prompt-2026-11-11.md) 和 [当前交接核验](docs/handoff-2026-11-11.md)。阶段五代码、自动测试、真实供应商/开发工具联调、隔离云机部署和 SSH 隧道核验的范围分别记录；公网 HTTPS、正式前端、微信真机及整体上线验收仍待完成。接口入口存在不代表对应模块已完整交付。
 
 ## 1. 阅读顺序与文件
 
@@ -491,7 +491,7 @@ join 同时校验账号、会员、直播状态，返回短效播放 URL、一�
 | `GET` | `/admin/users` | 后台权限 | `UserQuery` | `—` | `Page<AdminUser>` |
 | `GET` | `/admin/users/{id}` | 后台权限 | `—` | `—` | `AdminUser` |
 | `PUT` | `/admin/users/{id}/status` | 后台权限 | `—` | `{version, reason, status}` | `AdminUser` |
-| `PUT` | `/admin/users/{id}/roles` | 后台权限 | `—` | `{roles, reason}` | `AdminUser` |
+| `PUT` | `/admin/users/{id}/roles` | 后台权限 | `—` | `{roles, reason, version}` | `AdminUser` |
 | `GET` | `/admin/users/{id}/activity` | 后台权限 | `{from, to, learningPage, livePage}` | `—` | `UserActivity` |
 | `GET` | `/admin/users/{id}/grants` | 后台权限 | `PageQuery` | `—` | `Page<Grant>` |
 | `POST` | `/admin/users/{id}/grants` | 后台权限 | `—` | `GrantInput` | `Grant` |
@@ -893,7 +893,7 @@ export interface CoreApi {
   'GET /admin/users': Q<T.UserQuery, T.Page<T.AdminUser>>;
   'GET /admin/users/{id}': R<T.AdminUser>;
   'PUT /admin/users/{id}/status': B<T.VersionReason & { status: 'active' | 'banned' }, T.AdminUser>;
-  'PUT /admin/users/{id}/roles': B<{ roles: ('user' | 'teacher')[]; reason: string }, T.AdminUser>;
+  'PUT /admin/users/{id}/roles': B<{ roles: ('user' | 'teacher')[]; reason: string; version?: number }, T.AdminUser>;
   'GET /admin/users/{id}/activity': Q<{ from: T.DateOnly; to: T.DateOnly; learningPage?: number; livePage?: number }, T.UserActivity>;
   'GET /admin/users/{id}/grants': Q<T.PageQuery, T.Page<T.Grant>>;
   'POST /admin/users/{id}/grants': B<T.GrantInput, T.Grant>;

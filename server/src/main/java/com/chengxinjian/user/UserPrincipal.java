@@ -1,3 +1,3 @@
 package com.chengxinjian.user;
 
-public record UserPrincipal(String id) {}
+public record UserPrincipal(String id, String sessionId) {}

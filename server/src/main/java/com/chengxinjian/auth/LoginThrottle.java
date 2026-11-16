@@ -18,10 +18,17 @@ public class LoginThrottle {
     // 独立事务：登录失败时仍保留计数。仅保存摘要，不存原始账号或 IP。
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void attempt(String username, String ip) {
-        consume(TokenSecrets.hash("ip:" + ip), 100);
-        consume(TokenSecrets.hash("account:" + username + ":" + ip), 10);
+        consume(TokenSecrets.hash("ip:" + ip), 100, 60);
+        consume(TokenSecrets.hash("account:" + username + ":" + ip), 10, 60);
     }
-    private void consume(String key, int limit) {
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void smsSend(String phone,String user,String ip) {
+        consume(TokenSecrets.hash("sms:ip:" + ip), 20, 3600);
+        consume(TokenSecrets.hash("sms:user:" + user), 10, 86400);
+        consume(TokenSecrets.hash("sms:day:" + phone), 10, 86400);
+        consume(TokenSecrets.hash("sms:minute:" + phone), 1, 60);
+    }
+    private void consume(String key, int limit, int seconds) {
         var now = clock.instant();
         // Acquire an exclusive existing-row lock directly; duplicate INSERT + lock upgrade
         // deadlocks under concurrent login traffic on MySQL.
@@ -31,7 +38,7 @@ public class LoginThrottle {
             """,key,Timestamp.from(now));
         var row = jdbc.queryForMap("SELECT failed_count,window_started_at FROM login_throttle WHERE throttle_key = ? FOR UPDATE", key);
         var start = ((Timestamp) row.get("window_started_at")).toInstant();
-        boolean expired = Duration.between(start, now).toSeconds() >= 60;
+        boolean expired = Duration.between(start, now).toSeconds() >= seconds;
         int count = expired ? 0 : ((Number) row.get("failed_count")).intValue();
         if (count >= limit) {
             throw new BusinessException(HttpStatus.TOO_MANY_REQUESTS, "RATE_LIMITED", "请求过于频繁，请稍后重试");

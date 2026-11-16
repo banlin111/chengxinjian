@@ -10,6 +10,8 @@ import sys
 ROOT = Path(__file__).resolve().parents[1]
 WX_KEYS = {'WX_APP_ID', 'WX_APP_SECRET'}
 CLOUD_KEYS = {'CLOUD_PROVIDER','STORAGE_BUCKET','STORAGE_REGION','CLOUD_SECRET_ID','CLOUD_SECRET_KEY','FFMPEG_PATH'}
+PHONE_KEYS = {'SMS_SDK_APP_ID','SMS_SIGN_NAME','SMS_TEMPLATE_ID','SMS_REGION','SMS_SECRET_ID','SMS_SECRET_KEY',
+              'SMS_CAPTCHA_APP_ID','SMS_CAPTCHA_APP_SECRET','SMS_CAPTCHA_SECRET_ID','SMS_CAPTCHA_SECRET_KEY'}
 DB_KEYS = {'DB_URL','DB_USERNAME','DB_PASSWORD','SPRING_PROFILES_ACTIVE',
            'LOCAL_ADMIN_USERNAME','LOCAL_ADMIN_PASSWORD','LOCAL_CAPTCHA_TICKET'}
 TEST_KEYS = {'TEST_DB_URL','TEST_DB_USERNAME','TEST_DB_PASSWORD','TEST_DB_DRIVER'}
@@ -47,12 +49,15 @@ def main():
     parser.add_argument('--database-env', type=Path)
     parser.add_argument('--wechat', action='store_true', help='Explicitly load ignored .env.wechat.local')
     parser.add_argument('--cloud', action='store_true', help='Explicitly load ignored .env.cloud.local (never for tests)')
+    parser.add_argument('--phone', action='store_true', help='Load private phone provider config for local runtime only')
     args = parser.parse_args()
-    if args.cloud and args.action=='test':
+    if (args.cloud or args.phone or args.wechat) and args.action=='test':
         raise ValueError('Live cloud credentials cannot be loaded into tests')
     env = os.environ.copy()
     if args.database_env:
         env.update(load_private(args.database_env, TEST_KEYS if args.action=='test' else DB_KEYS))
+    if args.phone:
+        env.update(load_private(ROOT/'.env.phone.local', PHONE_KEYS))
     if args.wechat:
         env.update(load_private(ROOT/'.env.wechat.local', WX_KEYS))
     if args.cloud:

@@ -115,7 +115,7 @@ export interface CoreApi {
   'GET /admin/users': Q<T.UserQuery, T.Page<T.AdminUser>>;
   'GET /admin/users/{id}': R<T.AdminUser>;
   'PUT /admin/users/{id}/status': B<T.VersionReason & { status: 'active' | 'banned' }, T.AdminUser>;
-  'PUT /admin/users/{id}/roles': B<{ roles: ('user' | 'teacher')[]; reason: string }, T.AdminUser>;
+  'PUT /admin/users/{id}/roles': B<{ roles: ('user' | 'teacher')[]; reason: string; version?: number }, T.AdminUser>;
   'GET /admin/users/{id}/activity': Q<{ from: T.DateOnly; to: T.DateOnly; learningPage?: number; livePage?: number }, T.UserActivity>;
   'GET /admin/users/{id}/grants': Q<T.PageQuery, T.Page<T.Grant>>;
   'POST /admin/users/{id}/grants': B<T.GrantInput, T.Grant>;

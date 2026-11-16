@@ -2,6 +2,7 @@ package com.chengxinjian;
 
 import com.chengxinjian.media.MediaStorage;
 import com.chengxinjian.user.UserSessionService;
+import com.chengxinjian.user.WechatPhoneGateway;
 import com.fasterxml.jackson.databind.*;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.sql.Timestamp;
@@ -39,6 +40,7 @@ class CourseIntegrationTest {
     @Autowired ObjectMapper json;
     @Autowired UserSessionService sessions;
     @MockitoBean MediaStorage storage;
+    @MockitoBean WechatPhoneGateway phoneGateway;
     String admin,user,uid,teacher,category,cover,audio;
     static String id() { return UUID.randomUUID().toString(); }
     JsonNode http(MockHttpServletRequestBuilder req,String token,Object body,int expected) throws Exception {
@@ -163,6 +165,33 @@ class CourseIntegrationTest {
         http(put(ADMIN+"courses/"+c),admin,course("member_or_purchase").put("version",3),200);
         assertThat(play(l,id(),200).at("/access/reason").asText()).isEqualTo("member");
         assertThat(http(get("/api/v1/me/entitlements"),user,null,200).get("total").asInt()).isEqualTo(3);
+    }
+    @Test void claimingAnotherUsersPhoneDoesNotTransferSingleCoursePlayback() throws Exception {
+        String courseId = create("courses", course("purchase")).path("id").asText();
+        String lessonId = create("lessons", lesson(courseId, 0)).path("id").asText();
+        grant("course", courseId, null);
+        String phone = "13900000116";
+        String otherId = id();
+        var now = Timestamp.from(Instant.now());
+        jdbc.update("INSERT INTO app_user(id,nickname,status,version,created_at,updated_at,last_login_at) VALUES (?,'第二位用户','active',1,?,?,?)",
+            otherId, now, now, now);
+        String otherToken = sessions.create(otherId).accessToken();
+        String phoneCode = id();
+        when(phoneGateway.exchange(phoneCode)).thenReturn(phone);
+        var playbackRequest = Map.of("target", Map.of("kind", "lesson", "id", lessonId), "platform", "wechat_ios");
+        jdbc.update("UPDATE app_user SET phone=? WHERE id=?", phone, uid);
+        try {
+            var before = http(get("/api/v1/me/entitlements"), user, null, 200);
+            play(lessonId, id(), 200);
+            http(post(PLAY).header("Idempotency-Key", id()), otherToken, playbackRequest, 403);
+            http(put("/api/v1/me/phone/wechat"), otherToken, Map.of("phoneCode", phoneCode), 409);
+            assertThat(http(get("/api/v1/me/entitlements"), user, null, 200)).isEqualTo(before);
+            assertThat(http(get("/api/v1/me/entitlements"), otherToken, null, 200).path("total").asInt()).isZero();
+            play(lessonId, id(), 200);
+            http(post(PLAY).header("Idempotency-Key", id()), otherToken, playbackRequest, 403);
+        } finally {
+            jdbc.update("UPDATE app_user SET phone=NULL WHERE id=?", uid);
+        }
     }
     void grant(String kind,String c,Instant expiry) {
         jdbc.update("INSERT INTO entitlement_grant(id,user_id,kind,target_id,course_id,source,source_id,starts_at,expires_at) VALUES (?,?,?,?,?,'admin',?,?,?)",

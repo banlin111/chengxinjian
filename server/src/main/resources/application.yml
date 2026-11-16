@@ -56,6 +56,17 @@ app:
     bootstrap-username: ''
     bootstrap-password: ''
     allowed-origins: ${ADMIN_ALLOWED_ORIGINS:}
+  phone:
+    sms-app-id: ${SMS_SDK_APP_ID:}
+    sign: ${SMS_SIGN_NAME:}
+    template-id: ${SMS_TEMPLATE_ID:}
+    region: ${SMS_REGION:ap-guangzhou}
+    secret-id: ${SMS_SECRET_ID:}
+    secret-key: ${SMS_SECRET_KEY:}
+    captcha-app-id: ${SMS_CAPTCHA_APP_ID:0}
+    captcha-app-secret: ${SMS_CAPTCHA_APP_SECRET:}
+    captcha-secret-id: ${SMS_CAPTCHA_SECRET_ID:}
+    captcha-secret-key: ${SMS_CAPTCHA_SECRET_KEY:}
   captcha:
     app-id: ${CAPTCHA_APP_ID:0}
     app-secret-key: ${CAPTCHA_APP_SECRET_KEY:}

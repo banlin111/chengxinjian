@@ -19357,6 +19357,9 @@
                   },
                   "reason": {
                     "type": "string"
+                  },
+                  "version": {
+                    "type": "number"
                   }
                 },
                 "additionalProperties": false,
