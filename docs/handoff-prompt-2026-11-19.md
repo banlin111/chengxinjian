@@ -38,3 +38,8 @@
 从仓库根使用 ./scripts/backend.sh test 和 python3 scripts/local_backend.py test --database-env ../.tools/mysql-test.env 分别跑 H2 与 MySQL。运维/配置验证用 python3 -m unittest discover -s scripts -p 'test_*.py'。契约验证使用已有 Node 和 .tools/bin 的 PATH 跑 npm run check，再用 ../.tools/cos-runtime/bin/python -m openapi_spec_validator openapi.json。结合改动做打包 HTTP、隔离部署、相应真实联调。涉及第三方时按实际账号、素材、日期和端点记证据。
 
 更新实现清单、开发说明、前端文件/接口清单和证据路径。提交并正常推送到 codex/backend-foundation，核对远端 SHA 与对应 CI。每次报告分别写：①代码已写及范围，②自动测试，③真实第三方开发联调，④隔离云机与 SSH 隧道，⑤公网 HTTPS，⑥正式前端及微信真机（具体页面与机型），⑦上线验收。用“本次实测 / 历史证据 / 尚待验证”注明来源，单列失败与所缺条件。本地模拟、合成素材、小文件、IDE、云机小流量测试或接口数量都不能作为整个业务已实现、已验收或可正式上线的依据。
+
+
+六、同日后续实施记录
+
+上述 V10、分支 SHA 和优先任务为接手时基线。本日稍后已完成纯定时练习、服务端去重有效秒、本人记录、上海日统计及显式打卡第一批，实际代码与隔离部署为 5a4affb，云端 V12，本机 cxj_dev 仍为 V9。续接请先读 [练习与打卡交接](timer-practice-integration-2026-11-19.md) 的七层实测记录、前端文件和未完成项，再核对最新分支。正式页面及微信真机练习业务仍待接入验收。

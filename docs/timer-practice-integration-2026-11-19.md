@@ -49,3 +49,19 @@ Web 后台分支中未见管理工程。现有 GET /admin/users、/admin/users/{
 本机最终全量测试 H2、原生 MySQL 8.4.11 各 133 项，无失败、错误或跳过；其中七个新增集成场景覆盖并发创建、并发重复事件、跨设备重叠和间隙、时钟与计划上限、过期补传、跨午夜、换登录会话、终态重试、打卡并发/跨日重放及断签。手机号冲突保护和人工权益回归随全量通过。旧手机号测试首次全量执行时进程经过约 991 秒，5 分钟凭证已过期导致预期 400 实际 403；该测试改用固定时钟，再次全量通过。应用的凭证到期和手机号归属逻辑未变。Python 配置/运维 10 项通过，契约 224 个方法 / 785 个对象结构、OpenAPI 校验通过。上述验证不使用生产数据。
 
 真实微信开发联调使用开发者工具独立工程、微信 code2Session、端口 18083 的打包服务和 cxj_test。暂停后重试、退出再登录、恢复并完成，练习列表中 version=4，明细增加 3 秒，日统计也增加 3 秒和 1 次完成；显式打卡返回未配置。证据为 `practice-real.json`、`practice-probe.log`。本次没有使用短信、验证码、COS 或付费资源。
+
+## 本批交付记录（2026-11-19，上海时间）
+
+| 验收层级 | 本次实测及仍缺条件 |
+| --- | --- |
+| ① 代码 | 后端实现 `5a4affbcf5ec675628851354114c305637b6062d` 已推至 codex/backend-foundation。前端仍为 `223b2ea`。练习仅支持无音轨 timer；打卡规则保持未启用，无奖励、录制或混音实现。 |
+| ② 自动测试及打包 HTTP | H2 / MySQL 各 133 项（均无跳过），Python 10 项、契约、OpenAPI 通过。打包 JAR 另在 18084 / cxj_test 走通分类、讲师、公告 HTTP 回归。[实现提交 CI](https://github.com/banlin111/chengxinjian/actions/runs/44449766497) 的 contracts、backend 均 success，headSha 已核对。后续纯文档提交不在当前 CI 触发路径。 |
+| ③ 真实第三方开发联调 | 独立工程在微信 IDE 完成上述 wx.login → timer → 重登恢复 → finish → 统计流程。此次只调用微信开发身份，无短信发送、验证码票据、COS 用量或费用。课程/手机号在此前的真实开发联调见各自交接。 |
+| ④ 隔离云机与 SSH 隧道 | 镜像 cxj-api:5a4affb，JAR SHA-256 为 bae908ff264b0617a670c88b5b0d3996ef6189c69c5c1b5b995895843cd7e573，与本机微信探针、云端传入文件和容器内文件一致。MySQL healthy，V1–V12 成功。18081 隧道中途失去监听，已通过既有 SSH 配置重新建立。11 项断言通过：readiness UP、首页和公告 OK、缺批准协议 503、七个新入口匿名 401。云端账号、练习、区间、打卡均为零，云端认证写入仍待验证。 |
+| ⑤ 公网 HTTPS | 应用仅绑定云主机回环 18080，MySQL 无宿主映射。仍需域名、备案、DNS、证书、精确 CORS、微信合法域名等条件。 |
+| ⑥ 正式前端及微信真机 | 从同事提交重新构建关闭 mock 的 H5，以本机同源静态服务转发到 18081。Chromium 打开 pages/home/index 得到云端空态；打开 pages/practice/index 并点击“今日打卡”，跳到 pages/player/index?courseId=demo_kindness&from=practice，期间唯一业务请求为 GET /api/v1/home。现有微信构建包在 IDE 模拟器也实际打开首页空态、练习页及该按钮。真机型号：无；登录后的正式练习页、后台/锁屏、网络中断、真实手机和 Web 管理端仍待验证。purchase 标签缺陷本次核对代码仍存在，真实合成课程的显示证据来自 11 月 16 日。 |
+| ⑦ 上线验收 | 未完成。域名和批准协议、实名相关供应商能力、正式页面、授权长素材、真机与剩余业务验收均各自待办。 |
+
+迁移前私有全备 `cxj-auto-20261119T030733703259Z.sql.gz`、SHA-256 `16a54fa961ee1de21d25672d8516c5e9140af7a98ccc2fcf31b63472a3e505e1` 已拉取校验；迁移后全备 `cxj-auto-20261119T031333911267Z.sql.gz`、SHA-256 `151585c17631064e0b89a55a0e5339c5d0c2f4f1f0d664561e30575734bf6f93` 已恢复至新演练库。49 张表校验和与 12 次迁移一致，源库演练前后相同，演练库已移除，异机副本复核成功。旧镜像回切属 V10 历史验证，未执行此次 V12 带数据回滚。本机 cxj_dev 仍为 V9，未启动新版开发服务；后续若启动，先备份该库。
+
+本机证据位于 `server/target/`：`practice-{h2,mysql,python,contract,openapi,packaged-http}.log`、`practice-real.json`、`practice-{ci,h5-result,formal-ide}.json`、`practice-staging-{prebackup,postbackup,restore,state,http}.json`、`practice-deploy.log`。这些文件按既有约定留在 Git 外。下一项可独立开发的业务为经审核的白噪音/引导冥想目录与授权播放，随后衔接混音及预设；正式前端同事可并行接入上述七个接口。
