@@ -108,10 +108,10 @@ public class EditorialMedia {
         if (!"all".equals(admin.dataScope())) throw BusinessException.forbidden();
         var asset=media.get(admin,id);
         if (asset.version()!=decision.version()) throw MediaErrors.conflict("VERSION_CONFLICT","媒资已变更");
-        if (!"ready".equals(asset.status()) || !Set.of("avatar","cover","course_media").contains(asset.purpose()))
+        if (!"ready".equals(asset.status()) || !Set.of("avatar","cover","course_media","meditation_media","noise_media").contains(asset.purpose()))
             throw MediaErrors.conflict("ASSET_NOT_READY","仅可审核技术校验已通过的编辑素材");
         String state="approve".equals(decision.decision()) ? "approved" : "rejected";
-        boolean publish=state.equals("approved") && !asset.purpose().equals("course_media");
+        boolean publish=state.equals("approved") && Set.of("avatar","cover").contains(asset.purpose());
         String url=publish ? imageUrl(id) : null;
         byte[] bytes=publish ? render(asset) : null;
         return tx.execute(s->{

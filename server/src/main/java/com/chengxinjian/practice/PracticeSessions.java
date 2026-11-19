@@ -1,6 +1,8 @@
 package com.chengxinjian.practice;
 
 import com.chengxinjian.auth.TokenSecrets;
+import com.chengxinjian.catalog.PracticeAudioCatalog;
+import com.fasterxml.jackson.annotation.JsonInclude;
 import com.chengxinjian.catalog.CategoryModels.Page;
 import com.chengxinjian.common.*;
 import com.chengxinjian.user.*;
@@ -27,15 +29,17 @@ import org.springframework.web.bind.annotation.*;
 public class PracticeSessions {
     private static final String BASE = "/practice/sessions";
     private static final int HEARTBEAT_SECONDS = 20;
-    record Track(@NotBlank String noiseId, @NotNull Double volume) {}
+    record Track(@NotBlank @Size(max=36) String noiseId, @NotNull @DecimalMin("0") @DecimalMax("1") Double volume) {}
     record Start(@NotNull @Pattern(regexp="timer|guided|noise") String kind, @NotNull @Positive Integer plannedSeconds,
-                 @NotNull List<@NotNull @Valid Track> tracks, String meditationId, String mixPresetId, String endBellAssetId) {}
+                 @NotNull @Size(max=5) List<@NotNull @Valid Track> tracks, @Size(max=36) String meditationId, String mixPresetId, String endBellAssetId) {}
     record Event(@NotBlank @Size(max=36) String eventId, @NotNull @Positive Integer sequence,
                  @NotNull @Pattern(regexp="heartbeat|pause|resume|finish|abandon") String action,
                  @NotNull @PositiveOrZero Integer activeDeltaSeconds, @NotNull Instant occurredAt) {}
     record Practice(String id, int version, Instant createdAt, Instant updatedAt, String kind, String status,
                     Instant startedAt, Instant endedAt, int plannedSeconds, int creditedSeconds,
-                    boolean checkinEligible, int heartbeatSeconds) {}
+                    boolean checkinEligible, int heartbeatSeconds,
+                    @JsonInclude(JsonInclude.Include.NON_NULL) String meditationId,
+                    @JsonInclude(JsonInclude.Include.NON_NULL) List<Track> tracks) {}
     record Stats(LocalDate from, LocalDate to, long totalSeconds, long completedSessions,
                  int streakDays, int checkinDays, List<PracticeLedger.Day> daily) {}
 
@@ -46,8 +50,9 @@ public class PracticeSessions {
     private final Clock clock;
     private final int minTimer, maxTimer, eventCap, backlog;
     private final PracticeCheckins checkins;
+    private final PracticeAudioCatalog audio;
 
-    PracticeSessions(JdbcTemplate jdbc, UserService users, PracticeLedger ledger, ObjectMapper json, Clock clock, PracticeCheckins checkins,
+    PracticeSessions(JdbcTemplate jdbc, UserService users, PracticeLedger ledger, ObjectMapper json, Clock clock, PracticeCheckins checkins, PracticeAudioCatalog audio,
                      @Value("${app.practice.min-timer-seconds:1}") int minTimer,
                      @Value("${app.practice.max-timer-seconds:2147483647}") int maxTimer,
                      @Value("${app.practice.max-event-seconds:60}") int eventCap,
@@ -64,6 +69,7 @@ public class PracticeSessions {
         this.eventCap = eventCap;
         this.backlog = backlog;
         this.checkins = checkins;
+        this.audio = audio;
     }
 
     static String key(String value) {
@@ -86,7 +92,11 @@ public class PracticeSessions {
     private Practice replay(Map<String,Object> record, String hash) {
         if (!hash.equals(record.get("request_hash")))
             throw conflict("IDEMPOTENCY_CONFLICT", "相同的标识或序号已用于其他请求");
-        try { return json.readValue((String) record.get("snapshot"), Practice.class); }
+        return decodePractice((String)record.get("snapshot"));
+    }
+
+    private Practice decodePractice(String snapshot) {
+        try { return json.readValue(snapshot, Practice.class); }
         catch (java.io.IOException ex) { throw new IllegalStateException("Invalid stored practice snapshot", ex); }
     }
 
@@ -100,28 +110,46 @@ public class PracticeSessions {
             SELECT request_hash,create_snapshot AS snapshot FROM practice_session WHERE user_id=? AND create_key=?
             """, user.id(), key);
         if (!saved.isEmpty()) return ApiResponse.ok(replay(saved.getFirst(), hash));
-        if (!input.kind().equals("timer") || !input.tracks().isEmpty() || input.meditationId()!=null
-                || input.mixPresetId()!=null || input.endBellAssetId()!=null)
-            throw new BusinessException(HttpStatus.SERVICE_UNAVAILABLE, "FEATURE_UNAVAILABLE", "当前支持无音轨和提示音的纯定时练习");
+        boolean timer = input.kind().equals("timer"), guided = input.kind().equals("guided");
+        if (input.mixPresetId()!=null || input.endBellAssetId()!=null || timer && !input.tracks().isEmpty())
+            throw new BusinessException(HttpStatus.SERVICE_UNAVAILABLE, "FEATURE_UNAVAILABLE", "当前未接入预设、结束音或定时器混音");
+        if (guided != (input.meditationId()!=null) || input.kind().equals("noise") && input.tracks().isEmpty())
+            throw BusinessException.invalid("引导练习需要 meditationId，白噪音练习需要音轨");
+        if (input.tracks().stream().map(Track::noiseId).distinct().count()!=input.tracks().size())
+            throw BusinessException.invalid("同一音轨不能重复");
         if (input.plannedSeconds() < minTimer || input.plannedSeconds() > maxTimer)
             throw BusinessException.invalid("计划时长超出配置范围");
         var now = clock.instant().truncatedTo(ChronoUnit.SECONDS);
-        var practice = new Practice(UUID.randomUUID().toString(), 1, now, now, "timer", "active", now, null,
-            input.plannedSeconds(), 0, checkins.eligible(user.id()), HEARTBEAT_SECONDS);
+        var practice = new Practice(UUID.randomUUID().toString(), 1, now, now, input.kind(), "active", now, null,
+            input.plannedSeconds(), 0, checkins.eligible(user.id()), HEARTBEAT_SECONDS, input.meditationId(), timer ? null : input.tracks());
         jdbc.update("""
-            INSERT INTO practice_session(id,user_id,create_key,request_hash,create_snapshot,status,planned_seconds,started_sec,last_event_sec,updated_sec)
-            VALUES (?,?,?,?,?,'active',?,?,?,?)
-            """, practice.id(), user.id(), key, hash, encode(practice), input.plannedSeconds(), now.getEpochSecond(),
+            INSERT INTO practice_session(id,user_id,create_key,request_hash,create_snapshot,status,kind,planned_seconds,started_sec,last_event_sec,updated_sec)
+            VALUES (?,?,?,?,?,'active',?,?,?,?,?)
+            """, practice.id(), user.id(), key, hash, encode(practice), input.kind(), input.plannedSeconds(), now.getEpochSecond(),
             now.getEpochSecond(), now.getEpochSecond());
+        if (guided) bind(user, practice.id(), "meditation", input.meditationId(), -1, 1.0);
+        for (int i=0; i<input.tracks().size(); i++) {
+            var track=input.tracks().get(i);
+            bind(user, practice.id(), "noise", track.noiseId(), i, track.volume());
+        }
         return ApiResponse.ok(practice);
+    }
+
+    private void bind(UserPrincipal user,String session,String kind,String id,int order,double volume) {
+        var source=audio.authorize(user,kind,id);
+        jdbc.update("INSERT INTO practice_audio_track(session_id,audio_id,asset_id,track_no,volume) VALUES (?,?,?,?,?)",
+            session,id,source.asset(),order,volume);
     }
 
     private Practice practice(ResultSet r, boolean eligible) throws SQLException {
         Instant start = Instant.ofEpochSecond(r.getLong("started_sec"));
         Long end = r.getObject("ended_sec", Long.class);
-        return new Practice(r.getString("id"), r.getInt("version"), start, Instant.ofEpochSecond(r.getLong("updated_sec")),
-            "timer", r.getString("status"), start, end == null ? null : Instant.ofEpochSecond(end), r.getInt("planned_seconds"),
-            r.getInt("credited_seconds"), eligible, HEARTBEAT_SECONDS);
+        String id=r.getString("id"),kind=r.getString("kind");
+        // Persisted creation snapshots also preserve the selected order and volumes across new login sessions.
+        Practice initial="timer".equals(kind)?null:decodePractice(r.getString("create_snapshot"));
+        return new Practice(id, r.getInt("version"), start, Instant.ofEpochSecond(r.getLong("updated_sec")),
+            kind, r.getString("status"), start, end == null ? null : Instant.ofEpochSecond(end), r.getInt("planned_seconds"),
+            r.getInt("credited_seconds"), eligible, HEARTBEAT_SECONDS, initial==null?null:initial.meditationId(), initial==null?null:initial.tracks());
     }
 
     private Practice find(String user, String id) {
@@ -178,9 +206,18 @@ public class PracticeSessions {
             throw BusinessException.invalid("事件时间超出会话顺序或服务端时间");
         long end = Math.min(reported, now);
         int credited = session.creditedSeconds();
+        Long claimStart=null,claimEnd=null;
         if (session.status().equals("active")) {
             long start = Math.max(Math.max(previous, now - backlog), end - Math.min(input.activeDeltaSeconds(), eventCap));
-            credited += ledger.credit(user.id(), id, start, end, session.plannedSeconds() - credited);
+            int remaining=session.plannedSeconds()-credited;
+            if (!session.kind().equals("timer") && start<end) {
+                claimStart=start;
+                claimEnd=end;
+                if (status.equals("completed") && remaining>0 && !ledger.hasPlayed(id,start,end))
+                    throw conflict("PRACTICE_PLAYBACK_PENDING","请先发送最后的播放事件；未播放的时间请填 0");
+            }
+            credited += session.kind().equals("timer") ? ledger.credit(user.id(),id,start,end,remaining)
+                : ledger.creditPlayed(user.id(),id,start,end,remaining);
         }
         Long ended = status.equals("completed") || status.equals("abandoned") ? end : null;
         jdbc.update("""
@@ -188,9 +225,9 @@ public class PracticeSessions {
             """, status, credited, end, now, ended, id);
         var result = find(user.id(), id);
         jdbc.update("""
-            INSERT INTO practice_event(session_id,sequence_no,event_id,action,occurred_sec,request_hash,snapshot)
-            VALUES (?,?,?,?,?,?,?)
-            """, id, input.sequence(), input.eventId(), input.action(), end, hash, encode(result));
+            INSERT INTO practice_event(session_id,sequence_no,event_id,action,occurred_sec,request_hash,snapshot,claim_start_sec,claim_end_sec)
+            VALUES (?,?,?,?,?,?,?,?,?)
+            """, id, input.sequence(), input.eventId(), input.action(), end, hash, encode(result),claimStart,claimEnd);
         jdbc.update("INSERT INTO practice_event_request(session_id,request_key,sequence_no) VALUES (?,?,?)",
             id, key, input.sequence());
         return ApiResponse.ok(result);

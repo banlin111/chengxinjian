@@ -50,12 +50,12 @@ export interface Banner { id: ID; imageUrl: string; title: string; destination: 
 export type SearchHit = { kind: 'course'; item: Course } | { kind: 'meditation'; item: Meditation } | { kind: 'teacher'; item: Teacher } | { kind: 'live'; item: Live };
 export interface SearchQuery extends PageQuery { q: string; kind?: 'all' | 'course' | 'meditation' | 'teacher' | 'live' }
 export interface ContentQuery extends PageQuery { categoryId?: ID; teacherId?: ID; difficulty?: 'beginner' | 'intermediate' | 'advanced'; minSeconds?: number; maxSeconds?: number; memberOnly?: boolean; sort?: 'recommended' | 'newest' | 'duration_asc' }
-export interface PlaybackRequest { target: Target | { kind: 'noise' | 'mix_preset'; id: ID }; platform: Platform }
+export interface PlaybackRequest { practiceSessionId?: ID; target: Target | { kind: 'noise' | 'mix_preset'; id: ID }; platform: Platform }
 export interface Playback { playbackId: ID; url: string; expiresAt: DateTime; durationSeconds: number; resumeSeconds: number; access: Access; mediaKind: 'audio' | 'video'; heartbeatSeconds: number }
 export interface PlaybackEvent { eventId: ID; sequence: number; kind: 'playing' | 'pause' | 'seek' | 'ended' | 'background' | 'foreground'; positionSeconds: number; playedDeltaSeconds: number; speed: number; occurredAt: DateTime }
 export interface PlaybackAck { acceptedSequence: number; positionSeconds: number; creditedSeconds: number; completed: boolean }
 export interface PracticeStart { kind: 'guided' | 'timer' | 'noise'; meditationId?: ID; plannedSeconds: number; tracks: MixTrack[]; mixPresetId?: ID; endBellAssetId?: ID }
-export interface Practice extends Versioned { kind: 'guided' | 'timer' | 'noise'; status: 'active' | 'paused' | 'completed' | 'abandoned'; startedAt: DateTime; endedAt: DateTime | null; plannedSeconds: number; creditedSeconds: number; checkinEligible: boolean; heartbeatSeconds: number }
+export interface Practice extends Versioned { meditationId?: ID; tracks?: MixTrack[]; kind: 'guided' | 'timer' | 'noise'; status: 'active' | 'paused' | 'completed' | 'abandoned'; startedAt: DateTime; endedAt: DateTime | null; plannedSeconds: number; creditedSeconds: number; checkinEligible: boolean; heartbeatSeconds: number }
 export interface PracticeEvent { eventId: ID; sequence: number; action: 'heartbeat' | 'pause' | 'resume' | 'finish' | 'abandon'; activeDeltaSeconds: number; occurredAt: DateTime }
 export interface PracticeStats { from: DateOnly; to: DateOnly; totalSeconds: number; completedSessions: number; streakDays: number; checkinDays: number; daily: { date: DateOnly; seconds: number; checkedIn: boolean }[] }
 export interface Comment extends Versioned { target: Target; author: { id: ID; nickname: string; avatarUrl: string | null; isTeacher: boolean }; parentId: ID | null; text: string; status: ReviewStatus | 'deleted'; liked: boolean; likeCount: number; replyCount: number }

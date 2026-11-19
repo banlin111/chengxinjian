@@ -26,16 +26,17 @@ public class LearningLibrary {
     public record Like(@NotNull Boolean liked) {}
     private final JdbcTemplate jdbc; private final UserService users; private final CourseCatalog catalog;
     private final Clock clock; private final ObjectMapper json;
-    private final LearningHistory history;
-    public LearningLibrary(JdbcTemplate jdbc,UserService users,CourseCatalog catalog,Clock clock,ObjectMapper json,LearningHistory history) {
+    private final LearningHistory history; private final PracticeAudioCatalog audio;
+    public LearningLibrary(JdbcTemplate jdbc,UserService users,CourseCatalog catalog,Clock clock,ObjectMapper json,LearningHistory history,PracticeAudioCatalog audio) {
+        this.audio=audio;
         this.jdbc=jdbc;this.users=users;this.catalog=catalog;this.clock=clock;this.json=json;this.history=history;
     }
     private void kind(String kind) {
         if (!Set.of("course","lesson","meditation","replay").contains(kind)) throw BusinessException.invalid("内容类型无效");
-        if (!Set.of("course","lesson").contains(kind)) throw new BusinessException(org.springframework.http.HttpStatus.SERVICE_UNAVAILABLE,"FEATURE_UNAVAILABLE","此内容类型尚未接入");
+        if (!Set.of("course","lesson","meditation").contains(kind)) throw new BusinessException(org.springframework.http.HttpStatus.SERVICE_UNAVAILABLE,"FEATURE_UNAVAILABLE","此内容类型尚未接入");
     }
     private void visible(UserPrincipal user,String kind,String id) {
-        if("course".equals(kind)) catalog.course(id,null,user); else catalog.lesson(id,null,user);
+        if("course".equals(kind)) catalog.course(id,null,user); else if ("meditation".equals(kind)) audio.detail(kind,id,user,null); else catalog.lesson(id,null,user);
     }
     @PutMapping("/favorites/{kind}/{id}")
     ApiResponse<com.chengxinjian.auth.AdminAuthController.OK> favorite(@AuthenticationPrincipal UserPrincipal user,@PathVariable String kind,@PathVariable @Size(max=36) String id,@RequestBody @Valid Favorite body) {
@@ -71,9 +72,11 @@ public class LearningLibrary {
         String union="SELECT r.kind,r.target_id,c.title,cover.public_url,r.saved_at FROM user_content_relation r JOIN content_course c ON c.id=r.target_id " +
             "JOIN content_teacher t ON t.id=c.teacher_id JOIN content_category k ON k.id=c.category_id JOIN media_asset cover ON cover.id=c.cover_asset_id WHERE r.user_id=? AND r.favorite=TRUE AND r.kind='course' AND "+CourseCatalog.COURSE_VISIBLE+
             " UNION ALL SELECT r.kind,r.target_id,l.title,cover.public_url,r.saved_at FROM user_content_relation r JOIN content_lesson l ON l.id=r.target_id JOIN media_asset a ON a.id=l.asset_id "+
-            "JOIN content_course c ON c.id=l.course_id JOIN content_teacher t ON t.id=c.teacher_id JOIN content_category k ON k.id=c.category_id JOIN media_asset cover ON cover.id=c.cover_asset_id WHERE r.user_id=? AND r.favorite=TRUE AND r.kind='lesson' AND "+CourseCatalog.COURSE_VISIBLE+" AND "+CourseCatalog.LESSON_VISIBLE;
+            "JOIN content_course c ON c.id=l.course_id JOIN content_teacher t ON t.id=c.teacher_id JOIN content_category k ON k.id=c.category_id JOIN media_asset cover ON cover.id=c.cover_asset_id WHERE r.user_id=? AND r.favorite=TRUE AND r.kind='lesson' AND "+CourseCatalog.COURSE_VISIBLE+" AND "+CourseCatalog.LESSON_VISIBLE+
+            " UNION ALL SELECT r.kind,r.target_id,c.title,cover.public_url,r.saved_at "+PracticeAudioCatalog.FROM+
+            " JOIN user_content_relation r ON r.target_id=c.id WHERE r.user_id=? AND r.favorite=TRUE AND r.kind='meditation' AND c.kind='meditation' AND "+PracticeAudioCatalog.VISIBLE;
         String from=" FROM ("+union+") saved"+(kind==null?"":" WHERE kind=?");
-        List<Object> args=new ArrayList<>(List.of(user.id(),user.id())); if(kind!=null)args.add(kind);
+        List<Object> args=new ArrayList<>(List.of(user.id(),user.id(),user.id())); if(kind!=null)args.add(kind);
         long total=jdbc.queryForObject("SELECT COUNT(*)"+from,Long.class,args.toArray());args.add(pageSize);args.add(((long)page-1)*pageSize);
         var items=jdbc.query("SELECT *"+from+" ORDER BY saved_at DESC,kind,target_id LIMIT ? OFFSET ?",(r,n)->{
             var result=json.createObjectNode().put("title",r.getString("title")).put("coverUrl",r.getString("public_url")).put("savedAt",r.getTimestamp("saved_at").toInstant().toString());

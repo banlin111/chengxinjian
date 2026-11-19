@@ -1,6 +1,10 @@
 package com.chengxinjian;
 
 import com.chengxinjian.user.UserSessionService;
+import com.chengxinjian.media.MediaStorage;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.Mockito.when;
 import com.fasterxml.jackson.databind.*;
 import java.sql.Timestamp;
 import java.time.*;
@@ -25,7 +29,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @SpringBootTest(properties={
     "spring.datasource.url=${TEST_DB_URL:jdbc:h2:mem:practice;MODE=MySQL;DATABASE_TO_LOWER=TRUE;DB_CLOSE_DELAY=-1}",
     "spring.datasource.username=${TEST_DB_USERNAME:sa}", "spring.datasource.password=${TEST_DB_PASSWORD:}",
-    "spring.datasource.driver-class-name=${TEST_DB_DRIVER:org.h2.Driver}", "app.practice.checkin-seconds=12", "app.practice.rule-version=test-only"})
+    "spring.datasource.driver-class-name=${TEST_DB_DRIVER:org.h2.Driver}", "app.auth.bootstrap-username=practice-fixture","app.auth.bootstrap-password=practice-integration-only",
+    "app.auth.local-captcha-ticket=practice-integration-ticket","app.practice.checkin-seconds=12", "app.practice.rule-version=test-only"})
 @AutoConfigureMockMvc @ActiveProfiles("local")
 class PracticeIntegrationTest {
     static final String BASE = "/api/v1/practice/sessions";
@@ -46,6 +51,8 @@ class PracticeIntegrationTest {
     @Autowired ObjectMapper json;
     @Autowired UserSessionService sessions;
     @Autowired TestClock clock;
+    @MockitoBean MediaStorage storage;
+    final List<String> fixtureAssets=new ArrayList<>(), fixtureCategories=new ArrayList<>(), fixtureAudio=new ArrayList<>();
     String owner, token, other, otherToken;
 
     String uuid() { return UUID.randomUUID().toString(); }
@@ -60,12 +67,20 @@ class PracticeIntegrationTest {
         time(0);
         owner = uuid();
         other = uuid();
+        when(storage.preview(anyString(),any())).thenReturn("https://fixture.example/audio");
         token = user(owner);
         otherToken = user(other);
     }
     @AfterEach void cleanup() {
         for (String table : List.of("practice_event_request","practice_event"))
             jdbc.update("DELETE FROM " + table + " WHERE session_id IN (SELECT id FROM practice_session WHERE user_id IN (?,?))", owner, other);
+        for (String table:List.of("practice_played_interval","playback_ticket_snapshot","lesson_playback_event"))
+            jdbc.update("DELETE FROM "+table+" WHERE playback_id IN (SELECT id FROM lesson_playback WHERE user_id IN (?,?))",owner,other);
+        jdbc.update("DELETE FROM lesson_playback WHERE user_id IN (?,?)",owner,other);
+        jdbc.update("DELETE FROM practice_audio_track WHERE session_id IN (SELECT id FROM practice_session WHERE user_id IN (?,?))",owner,other);
+        for (String id:fixtureAudio) jdbc.update("DELETE FROM practice_audio WHERE id=?",id);
+        for (String id:fixtureAssets) jdbc.update("DELETE FROM media_asset WHERE id=?",id);
+        for (String id:fixtureCategories) jdbc.update("DELETE FROM content_category WHERE id=?",id);
         for (String table : List.of("practice_checkin_request","practice_checkin","practice_credit","practice_session","user_auth_session"))
             jdbc.update("DELETE FROM " + table + " WHERE user_id IN (?,?)", owner, other);
         jdbc.update("DELETE FROM app_user WHERE id IN (?,?)", owner, other);
@@ -210,7 +225,7 @@ class PracticeIntegrationTest {
         write(BASE,uuid(),timer(0),400);
         for (String kind : List.of("noise","guided")) {
             var body=new HashMap<>(timer(5));body.put("kind",kind);
-            assertThat(write(BASE,uuid(),body,503).asText()).isEqualTo("FEATURE_UNAVAILABLE");
+            assertThat(write(BASE,uuid(),body,400).asText()).isEqualTo("VALIDATION_FAILED");
         }
         var bell=new HashMap<>(timer(5));bell.put("endBellAssetId",uuid());
         write(BASE,uuid(),bell,503);
@@ -264,5 +279,87 @@ class PracticeIntegrationTest {
         send(later,1,"finish",20,3*86400+70);
         assertThat(write(path,uuid(),Map.of("practiceSessionId",later),200).path("streakDays").asInt()).isEqualTo(1);
         assertThat(stats(token).path("streakDays").asInt()).isEqualTo(2);
+    }
+
+    String audioFixture(String kind) {
+        String category=uuid(),id=uuid(),cover=uuid(),file=uuid();
+        var at=Timestamp.from(START);
+        jdbc.update("INSERT INTO content_category(id,name,kind,sort_order,status,version,created_at,updated_at) VALUES (?,?,?,0,'published',1,?,?)",
+            category,category,kind,at,at);
+        fixtureCategories.add(category);
+        for (String asset:List.of(cover,file)) {
+            boolean image=asset.equals(cover);
+            jdbc.update("""
+                INSERT INTO media_asset(id,purpose,filename,mime_type,size_bytes,duration_seconds,sha256,object_key,status,review_status,owner_admin_id,public_url,created_at,updated_at)
+                VALUES (?,?,?, ?,100,60,?,?,'ready','approved',(SELECT id FROM admin_account WHERE username='practice-fixture'),?,?,?)
+                """,asset,image?"cover":kind+"_media","fixture",image?"image/png":"audio/wav","1".repeat(64),"validated/"+asset+"/source",
+                image?"https://fixture.example/cover":null,at,at);
+            fixtureAssets.add(asset);
+        }
+        jdbc.update("""
+            INSERT INTO practice_audio(id,kind,title,summary,category_id,cover_asset_id,asset_id,access_policy,status,version,created_at,updated_at)
+            VALUES (?,?,?,'',?,?,?,'free','published',1,?,?)
+            """,id,kind,kind,category,cover,file,at,at);
+        fixtureAudio.add(id);return id;
+    }
+    String bound(String kind,String target,String session) throws Exception {
+        return write("/api/v1/playbacks",uuid(),Map.of("target",Map.of("kind",kind,"id",target),
+            "platform","wechat_ios","practiceSessionId",session),200).path("playbackId").asText();
+    }
+    Map<String,Object> played(int seq,int pos,int sec,int at) {
+        return Map.of("eventId",uuid(),"sequence",seq,"positionSeconds",pos,"playedDeltaSeconds",sec,
+            "speed",1,"kind","playing","occurredAt",START.plusSeconds(at).toString());
+    }
+    @Test void overlappingNoiseAndDevicesSettleOnceInEitherDeliveryOrder() throws Exception {
+        var one=audioFixture("noise");var two=audioFixture("noise");
+        var tracks=List.of(Map.of("noiseId",one,"volume",0.5),Map.of("noiseId",two,"volume",1));
+        var session=write(BASE,uuid(),Map.of("kind","noise","plannedSeconds",60,"tracks",tracks),200).path("id").asText();
+        var x=bound("noise",one,session);var y=bound("noise",two,session);
+        String timer=start(60);
+        time(15);
+        // The first stream alone (in this case the practice heartbeat) has no confirmed media seconds.
+        assertThat(send(session,1,"heartbeat",15,15).path("creditedSeconds").asInt()).isZero();
+        var input=played(1,15,15,15);
+        String alias=uuid();
+        var accepted=race(List.of(()->write("/api/v1/playbacks/"+x+"/events",uuid(),input,200),
+            ()->write("/api/v1/playbacks/"+y+"/events",uuid(),input,200)));
+        write("/api/v1/playbacks/"+x+"/events",alias,input,200);
+        write("/api/v1/playbacks/"+x+"/events",alias,played(2,15,0,15),409);
+        assertThat(accepted.getFirst().path("creditedSeconds").asInt()).isEqualTo(15);
+        write("/api/v1/playbacks/"+x+"/events",uuid(),input,200);
+        assertThat(send(timer,1,"finish",15,15).path("creditedSeconds").asInt()).isZero();
+        assertThat(http(get(BASE+"/"+session),token,null,200).at("/data/creditedSeconds").asInt()).isEqualTo(15);
+        time(20);
+        write("/api/v1/playbacks/"+x+"/events",uuid(),played(2,20,5,20),200);
+        assertThat(send(session,2,"finish",5,20).path("creditedSeconds").asInt()).isEqualTo(20);
+        assertThat(stats(token).path("daily").findValues("seconds").stream().map(JsonNode::asInt).toList()).containsExactly(10,10,0);
+        assertThat(stats(token).path("totalSeconds").asInt()).isEqualTo(20);
+    }
+
+    @Test void guidedPracticeNeedsNarrationAndCannotCreditSeekOrPausedTime() throws Exception {
+        String guide=audioFixture("meditation"),noise=audioFixture("noise");
+        var start=Map.of("kind","guided","meditationId",guide,"tracks",List.of(Map.of("noiseId",noise,"volume",0.2)),"plannedSeconds",50);
+        String session=write(BASE,uuid(),start,200).path("id").asText();
+        String main=bound("meditation",guide,session),ambient=bound("noise",noise,session);
+        time(10);
+        write("/api/v1/playbacks/"+ambient+"/events",uuid(),played(1,10,10,10),200);
+        var seek=new HashMap<>(played(1,20,10,10));seek.put("kind","seek");
+        write("/api/v1/playbacks/"+main+"/events",uuid(),seek,200);
+        assertThat(send(session,1,"heartbeat",10,10).path("creditedSeconds").asInt()).isZero();
+        time(18);
+        var finish=event(2,"finish",8,18);
+        assertThat(write(events(session),uuid(),finish,409).asText()).isEqualTo("PRACTICE_PLAYBACK_PENDING");
+        send(session,2,"pause",8,18);
+        time(24);
+        write("/api/v1/playbacks/"+main+"/events",uuid(),played(2,28,8,18),200);
+        send(session,3,"resume",0,24);
+        time(30);
+        var sped=new HashMap<>(played(3,40,12,30));sped.put("speed",2);
+        write("/api/v1/playbacks/"+main+"/events",uuid(),sped,200);
+        var done=send(session,4,"finish",20,30);
+        assertThat(done.path("creditedSeconds").asInt()).isEqualTo(14);
+        assertThat(done.path("meditationId").asText()).isEqualTo(guide);
+        assertThat(stats(token).path("totalSeconds").asInt()).isEqualTo(14);
+        http(post("/api/v1/playbacks/"+main+"/renew").header("Idempotency-Key",uuid()),token,null,409);
     }
 }

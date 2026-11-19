@@ -44649,6 +44649,9 @@
       "PlaybackRequest": {
         "type": "object",
         "properties": {
+          "practiceSessionId": {
+            "type": "string"
+          },
           "target": {
             "anyOf": [
               {
@@ -45127,6 +45130,15 @@
       "Practice": {
         "type": "object",
         "properties": {
+          "meditationId": {
+            "type": "string"
+          },
+          "tracks": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MixTrack"
+            }
+          },
           "kind": {
             "enum": [
               "guided",

@@ -8,9 +8,12 @@ import logging
 import os
 from pathlib import Path
 import secrets
+import socket
 import struct
 import subprocess
 import sys
+import tempfile
+import zipfile
 import time
 import uuid
 import wave
@@ -21,22 +24,32 @@ from local_backend import ROOT, CLOUD_KEYS, WX_KEYS, TEST_KEYS, load_private
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--run-real-cloud-upload', action='store_true', required=True)
-    parser.add_argument('--course-probe', action='store_true', help='Exercise editorial media, a paid lesson and wx.login in the local IDE')
+    provider = parser.add_mutually_exclusive_group(required=True)
+    provider.add_argument('--run-real-cloud-upload', action='store_true')
+    provider.add_argument('--loopback-audio', action='store_true', help='Use temporary in-memory local objects and real WeChat login')
+    modes = parser.add_mutually_exclusive_group()
+    modes.add_argument('--audio-probe', action='store_true', help='Exercise only reviewed guided and noise audio with the real IDE')
+    modes.add_argument('--course-probe', action='store_true', help='Exercise editorial media, a paid lesson and wx.login in the local IDE')
     parser.add_argument('--mobile-project', type=Path,
                         help='Also verify the compiled frontend in Chromium (requires --course-probe)')
     args = parser.parse_args()
+    if args.loopback_audio:
+        if args.course_probe or args.mobile_project:
+            parser.error('--loopback-audio supports the audio probe only')
+        args.audio_probe = True
+    with socket.socket() as port:
+        port.bind(('127.0.0.1', 18082))
     if args.mobile_project and (not args.course_probe or not (args.mobile_project / 'dist/build/h5/index.html').is_file()):
         parser.error('--mobile-project requires --course-probe and a built apps/mobile directory')
     logging.disable(logging.CRITICAL)
     import requests
     from qcloud_cos import CosConfig, CosS3Client
     from qcloud_cos.cos_exception import CosServiceError
-    cloud = load_private(ROOT / '.env.cloud.local', CLOUD_KEYS)
+    cloud = load_private(ROOT / '.env.cloud.local', {'FFMPEG_PATH'} if args.loopback_audio else CLOUD_KEYS)
     test = load_private(ROOT.parent / '.tools/mysql-test.env', TEST_KEYS)
     if not test.get('TEST_DB_URL', '').startswith('jdbc:mysql://127.0.0.1:33306/cxj_test?'):
         raise ValueError('Only isolated cxj_test is authorized')
-    evidence = ROOT / 'server/target' / ('course-cos-smoke' if args.course_probe else 'media-cos-smoke')
+    evidence = ROOT / 'server/target' / ('practice-audio-loopback' if args.loopback_audio else 'practice-audio-smoke' if args.audio_probe else 'course-cos-smoke' if args.course_probe else 'media-cos-smoke')
     evidence.mkdir(parents=True, exist_ok=True)
     mysql = next((ROOT.parent / '.tools').glob('mysql-*/bin/mysql'))
 
@@ -56,8 +69,11 @@ def main():
     username = 'cloud-smoke-' + uuid.uuid4().hex[:12]
     password, captcha = secrets.token_urlsafe(24), secrets.token_urlsafe(24)
     env = os.environ.copy()
+    if args.loopback_audio:
+        env = {key: env[key] for key in ('PATH','HOME','TMPDIR','LANG') if key in env}
+        env['CLOUD_PROVIDER'] = 'loopback'
     env.update(cloud)
-    if args.course_probe:
+    if args.course_probe or args.audio_probe:
         env.update(load_private(ROOT / '.env.wechat.local', WX_KEYS))
     env.update(DB_URL=test['TEST_DB_URL'], DB_USERNAME=test['TEST_DB_USERNAME'], DB_PASSWORD=test['TEST_DB_PASSWORD'],
                SPRING_PROFILES_ACTIVE='local,mysql', SERVER_PORT='18082', LOCAL_ADMIN_USERNAME=username,
@@ -73,8 +89,9 @@ def main():
     derived_keys = []
     course_fixture = {}
     grants = []
+    audio_cleanup = []
 
-    client = CosS3Client(CosConfig(Region=cloud['STORAGE_REGION'], SecretId=cloud['CLOUD_SECRET_ID'],
+    client = None if args.loopback_audio else CosS3Client(CosConfig(Region=cloud['STORAGE_REGION'], SecretId=cloud['CLOUD_SECRET_ID'],
                                  SecretKey=cloud['CLOUD_SECRET_KEY'], Scheme='https', Timeout=10), retry=0)
     base, token = 'http://127.0.0.1:18082/api/v1', None
 
@@ -134,12 +151,22 @@ def main():
         asset_id = ticket['assetId']
         uuid.UUID(asset_id)
         created.append(asset_id)
-        fields = ticket['formData']
-        check(name + ': temporary credential only', fields['q-ak'] != cloud['CLOUD_SECRET_ID'] and
-              cloud['CLOUD_SECRET_KEY'] not in json.dumps(ticket))
-        response = requests.post(ticket['uploadUrl'], data=fields,
-                                 files={'file': (name, payload, mime)}, timeout=30, allow_redirects=False)
-        check(name + ': real COS POST 204', response.status_code == 204)
+        if args.loopback_audio:
+            from urllib.parse import urlsplit
+            if urlsplit(ticket['uploadUrl']).hostname != '127.0.0.1':
+                raise RuntimeError('Expected loopback storage')
+            local = requests.Session()
+            local.trust_env = False
+            with local:
+                response = local.put(ticket['uploadUrl'], data=payload, timeout=10, allow_redirects=False)
+            check(name + ': loopback upload 204', response.status_code == 204)
+        else:
+            fields = ticket['formData']
+            check(name + ': temporary credential only', fields['q-ak'] != cloud['CLOUD_SECRET_ID'] and
+                  cloud['CLOUD_SECRET_KEY'] not in json.dumps(ticket))
+            response = requests.post(ticket['uploadUrl'], data=fields,
+                                     files={'file': (name, payload, mime)}, timeout=30, allow_redirects=False)
+            check(name + ': real COS POST 204', response.status_code == 204)
         complete_key = str(uuid.uuid4())
         initial = api('POST', '/uploads/' + asset_id + '/complete', {'sha256': body['sha256']}, complete_key)
         check(name + ': queued for server validation', initial['status'] == 'processing')
@@ -156,7 +183,24 @@ def main():
         return result, ticket
 
     log = (evidence / 'server.log').open('w')
-    process = subprocess.Popen([str(java), '-Duser.timezone=UTC', '-jar', str(jar)], cwd=ROOT / 'server', env=env, stdout=log, stderr=subprocess.STDOUT)
+    runtime = tempfile.TemporaryDirectory()
+    command = [str(java), '-Duser.timezone=UTC', '-jar', str(jar)]
+    if args.loopback_audio:
+        # Compile an external test-only Spring bean against the identical packaged application.
+        root = Path(runtime.name)
+        classes = root / 'probe'
+        classes.mkdir()
+        with zipfile.ZipFile(jar) as archive:
+            for name in archive.namelist():
+                if name.startswith(('BOOT-INF/classes/', 'BOOT-INF/lib/')):
+                    archive.extract(name, root)
+        subprocess.run([str(java.with_name('javac')), '-proc:none', '-d', str(classes), '-cp',
+                        str(root/'BOOT-INF/classes')+os.pathsep+str(root/'BOOT-INF/lib/*'),
+                        str(ROOT/'scripts/probes/LoopbackAudioStorage.java')], check=True)
+        command = [str(java), '-Duser.timezone=UTC', '-Dloader.path='+str(classes), '-cp', str(jar),
+                   'org.springframework.boot.loader.launch.PropertiesLauncher', '--spring.main.sources=cxj.probe.LoopbackAudioStorage']
+        report['object_storage'] = 'loopback, volatile objects; no cloud provider'
+    process = subprocess.Popen(command, cwd=ROOT / 'server', env=env, stdout=log, stderr=subprocess.STDOUT)
     try:
         deadline = time.monotonic() + 60
         while time.monotonic() < deadline:
@@ -174,6 +218,19 @@ def main():
         report['checks'].append('readiness UP')
         login = api('POST', '/admin/auth/login', dict(username=username, password=password, captchaTicket=captcha))
         token = login['accessToken']
+        if args.course_probe or args.audio_probe:
+            # Grant review only to this run's temporary account in the disposable schema.
+            sql("INSERT INTO admin_role(id,name) VALUES ('"+review_role+"','"+review_role+"');"
+                "INSERT INTO admin_role_permission VALUES ('"+review_role+"','moderation:review');"
+                "INSERT INTO admin_role_permission VALUES ('"+review_role+"','users:write');"
+                "INSERT INTO admin_account_role SELECT id,'"+review_role+"' FROM admin_account WHERE username='"+username+"';")
+
+        if args.audio_probe:
+            from smoke_practice_audio import exercise
+            exercise(api, upload, check, png(), cloud['FFMPEG_PATH'], report, audio_cleanup, grants)
+            api('POST', '/admin/auth/logout', {'refreshToken': login['refreshToken']})
+            report['passed'] = True
+            return
         image = png()
         result, image_ticket = upload('fixture.png', 'avatar', 'image/png', image)
         check('decoded image ready and private', result['status'] == 'ready' and result['publicUrl'] is None)
@@ -223,12 +280,6 @@ def main():
         check('video fully decoded with duration in seconds', result['status'] == 'ready' and result['durationSeconds'] in ((4, 5) if args.course_probe else (1, 2)) and result['publicUrl'] is None)
 
         if args.course_probe:
-            # Grant review only to this run's temporary account in the disposable schema.
-            sql("INSERT INTO admin_role(id,name) VALUES ('"+review_role+"','"+review_role+"');"
-                "INSERT INTO admin_role_permission VALUES ('"+review_role+"','moderation:review');"
-                "INSERT INTO admin_role_permission VALUES ('"+review_role+"','users:write');"
-                "INSERT INTO admin_account_role SELECT id,'"+review_role+"' FROM admin_account WHERE username='"+username+"';")
-
             def review(asset, decision='approve'):
                 uid = asset['id']
                 latest = api('GET', '/assets/'+uid)
@@ -356,11 +407,12 @@ def main():
         except subprocess.TimeoutExpired:
             process.kill(); process.wait()
         log.close()
+        runtime.cleanup()
         try:
             for asset_id in created:
                 keys = ['quarantine/'+asset_id+'/source', 'validated/'+asset_id+'/source']
                 keys.extend(key for key in derived_keys if key.startswith('trials/'+asset_id+'/'))
-                for object_key in keys:
+                for object_key in ([] if args.loopback_audio else keys):
                     client.delete_object(Bucket=cloud['STORAGE_BUCKET'], Key=object_key)
                     try:
                         client.head_object(Bucket=cloud['STORAGE_BUCKET'], Key=object_key)
@@ -373,7 +425,7 @@ def main():
                 sql("UPDATE media_asset SET status='rejected',public_url=NULL,failure_code='TEST_FIXTURE_CLEANED',quarantine_cleaned=TRUE,version=version+1 WHERE id='" + asset_id + "';")
             sql("UPDATE auth_session SET revoked=TRUE WHERE account_id IN (SELECT id FROM admin_account WHERE username='" + username + "');")
             sql("UPDATE admin_account SET enabled=FALSE WHERE username='" + username + "';")
-            if args.course_probe:
+            if args.course_probe or args.audio_probe:
                 sql("DELETE FROM admin_account_role WHERE role_id='"+review_role+"';"
                     "DELETE FROM admin_role_permission WHERE role_id='"+review_role+"';DELETE FROM admin_role WHERE id='"+review_role+"';")
                 for grant in grants:
@@ -381,6 +433,10 @@ def main():
                 for resource, table in [('lessons','content_lesson'),('courses','content_course'),('teachers','content_teacher'),('categories','content_category')]:
                     if resource in course_fixture:
                         sql("UPDATE "+table+" SET status='archived' WHERE id='"+course_fixture[resource]+"';")
+                for table, item in reversed(audio_cleanup):
+                    if table not in ('practice_audio','content_category','membership_plan'):
+                        raise RuntimeError('Unknown fixture table')
+                    sql("UPDATE "+table+" SET status='archived' WHERE id='"+str(uuid.UUID(item))+"';")
                 for asset_id in created:
                     sql("DELETE FROM editorial_image WHERE asset_id='"+asset_id+"';")
                 (evidence / 'derived.mp4').unlink(missing_ok=True)

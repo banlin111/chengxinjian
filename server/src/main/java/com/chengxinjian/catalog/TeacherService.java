@@ -160,7 +160,8 @@ public class TeacherService {
     private void checkCourses(String id,String status) {
         if ("published".equals(status)) return;
         String active="archived".equals(status) ? " AND status<>'archived'" : " AND status='published'";
-        if(jdbc.queryForObject("SELECT COUNT(*) FROM content_course WHERE teacher_id=?"+active,Long.class,id)>0)
+        if(jdbc.queryForObject("SELECT COUNT(*) FROM content_course WHERE teacher_id=?"+active,Long.class,id)>0
+            || jdbc.queryForObject("SELECT COUNT(*) FROM practice_audio WHERE teacher_id=?"+active,Long.class,id)>0)
             throw conflict("CONTENT_IN_USE","请先调整此讲师的课程");
     }
     private void requireScope(AdminPrincipal admin,String id) {

@@ -353,4 +353,77 @@ class CourseIntegrationTest {
         assertThat(play(l,id(),200).get("resumeSeconds").asInt()).isZero();
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM lesson_progress WHERE user_id=?",Long.class,uid)).isEqualTo(1);
     }
+    ObjectNode soundInput(String kind,String policy,String review) throws Exception {
+        String owner=jdbc.queryForObject("SELECT id FROM admin_account WHERE username='integration-admin'",String.class);
+        String cat=create("categories",Map.of("name",kind,"kind",kind,"sort",1,"status","published")).path("id").asText();
+        String asset=asset(owner,kind+"_media","audio/wav",review,60);
+        var out=json.createObjectNode().put("title","练习音频").put("assetId",asset).put("categoryId",cat).put("coverAssetId",cover)
+            .put("accessPolicy",policy).put("status","published");
+        if (kind.equals("meditation")) out.put("teacherId",teacher).put("summary","引导说明");
+        return out;
+    }
+    @Test void audioReviewControlsCatalogTicketsAndFavorites() throws Exception {
+        var input=soundInput("meditation","free","pending");
+        String resource="meditations", key=id();
+        http(post(ADMIN+resource).header("Idempotency-Key",key),admin,input,409);
+        jdbc.update("INSERT INTO admin_role_permission SELECT 'role-content-manager','moderation:review' WHERE NOT EXISTS (SELECT 1 FROM admin_role_permission WHERE role_id='role-content-manager' AND permission_code='moderation:review')");
+        try {
+            String asset=input.path("assetId").asText();
+            String review="/api/v1/admin/assets/"+asset+"/review";
+            http(put(review),admin,Map.of("decision","approve","version",1,"reason","校验"),200);
+            assertThat(http(get("/api/v1/assets/"+asset),admin,null,200).path("publicUrl").isNull()).isTrue();
+            var first=http(post(ADMIN+resource).header("Idempotency-Key",key),admin,input,200);
+            String med=first.path("id").asText();
+            assertThat(http(post(ADMIN+resource).header("Idempotency-Key",key),admin,input,200)).isEqualTo(first);
+            var detail=http(get("/api/v1/meditations/"+med),null,null,200);
+            assertThat(detail.path("durationSeconds").asInt()).isEqualTo(60);
+            assertThat(detail.has("assetId")).isFalse();assertThat(detail.has("url")).isFalse();
+            http(put("/api/v1/me/favorites/meditation/"+med),user,Map.of("favorite",true),200);
+            assertThat(http(get("/api/v1/meditations/"+med),user,null,200).path("favorite").asBoolean()).isTrue();
+            assertThat(http(get("/api/v1/me/favorites").param("kind","meditation"),user,null,200).path("total").asInt()).isEqualTo(1);
+            var req=Map.of("target",Map.of("kind","meditation","id",med),"platform","wechat_ios");
+            String playKey=id();
+            var ticket=http(post(PLAY).header("Idempotency-Key",playKey),user,req,200);
+            assertThat(ticket.path("url").asText()).endsWith("/validated/"+asset+"/source");
+            http(put(ADMIN+resource+"/"+med),admin,input.deepCopy().put("version",100),409);
+            http(delete(ADMIN+"categories/"+input.path("categoryId").asText()),admin,Map.of("reason","引用","version",1),409);
+            http(put(review),admin,Map.of("decision","reject","version",2,"reason","撤回"),200);
+            http(get("/api/v1/meditations/"+med),null,null,404);
+            assertThat(http(get("/api/v1/me/favorites"),user,null,200).path("total").asInt()).isZero();
+            http(post(PLAY).header("Idempotency-Key",playKey),user,req,404);
+            http(post(PLAY+"/"+ticket.path("playbackId").asText()+"/renew").header("Idempotency-Key",id()),user,null,404);
+        } finally {
+            jdbc.update("DELETE FROM admin_role_permission WHERE role_id='role-content-manager' AND permission_code='moderation:review'");
+        }
+    }
+
+    @Test void paidNoiseRequiresLiveMembershipAndBindingToSameUserTrackAndFile() throws Exception {
+        var body=soundInput("noise","member","approved");
+        String noise=create("noises",body).path("id").asText();
+        var req=json.createObjectNode().put("platform","wechat_ios");
+        req.putObject("target").put("kind","noise").put("id",noise);
+        var start=Map.of("kind","noise","plannedSeconds",120,"tracks",List.of(Map.of("noiseId",noise,"volume",0.5)));
+        String base="/api/v1/practice/sessions";
+        http(post(base).header("Idempotency-Key",id()),user,start,403);
+        http(post(PLAY).header("Idempotency-Key",id()),user,req,403);
+        grant("membership",null,null);
+        var session=http(post(base).header("Idempotency-Key",id()),user,start,200);
+        assertThat(session.at("/tracks/0/noiseId").asText()).isEqualTo(noise);
+        req.put("practiceSessionId",id());
+        http(post(PLAY).header("Idempotency-Key",id()),user,req,404);
+        req.put("practiceSessionId",session.path("id").asText());
+        var ticket=http(post(PLAY).header("Idempotency-Key",id()),user,req,200);
+        String renew=PLAY+"/"+ticket.path("playbackId").asText()+"/renew";
+        assertThat(ticket.at("/access/reason").asText()).isEqualTo("member");
+        jdbc.update("UPDATE entitlement_grant SET revoked_at=CURRENT_TIMESTAMP WHERE user_id=?",uid);
+        http(post(renew).header("Idempotency-Key",id()),user,null,403);
+        grant("membership",null,null);
+        var replacement=soundInput("noise","member","approved");
+        http(put(ADMIN+"noises/"+noise),admin,replacement.put("version",1),200);
+        http(post(PLAY).header("Idempotency-Key",id()),user,req,409);
+        http(post(renew).header("Idempotency-Key",id()),user,null,409);
+        http(delete(ADMIN+"noises/"+noise),admin,Map.of("reason","归档","version",2),200);
+        assertThat(http(get("/api/v1/noises").param("categoryId",replacement.path("categoryId").asText()),null,null,200).path("total").asInt()).isZero();
+        http(post(PLAY).header("Idempotency-Key",id()),user,req,404);
+    }
 }

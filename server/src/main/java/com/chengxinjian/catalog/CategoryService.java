@@ -112,7 +112,8 @@ public class CategoryService {
     private void checkCourses(String id,boolean typeChanged,String status) {
         if (!typeChanged && "published".equals(status)) return;
         String active=typeChanged ? "" : ("archived".equals(status) ? " AND status<>'archived'" : " AND status='published'");
-        if (jdbc.queryForObject("SELECT COUNT(*) FROM content_course WHERE category_id=?"+active,Long.class,id)>0)
+        if (jdbc.queryForObject("SELECT COUNT(*) FROM content_course WHERE category_id=?"+active,Long.class,id)>0
+            || jdbc.queryForObject("SELECT COUNT(*) FROM practice_audio WHERE category_id=?"+active,Long.class,id)>0)
             throw new BusinessException(HttpStatus.CONFLICT,"CONTENT_IN_USE","请先调整引用此分类的课程");
     }
     private void requireGlobalScope(AdminPrincipal admin) {
