@@ -397,6 +397,33 @@ class CourseIntegrationTest {
         }
     }
 
+    @Test void publicMixRequiresPublishedNoisesAndNeverIncludesPersonalRecipes() throws Exception {
+        String route="/api/v1/mix-presets";
+        var file=soundInput("noise","member","approved");
+        String noise=create("noises",file).path("id").asText();
+        var tracks=List.of(Map.of("noiseId",noise,"volume",0.6));
+        var personal=http(post("/api/v1/me/mix-presets").header("Idempotency-Key",id()),user,Map.of("tracks",tracks,"title","本人"),200);
+        var item=create("mix-presets",Map.of("tracks",tracks,"title","公开","status","draft"));
+        String edit=ADMIN+"mix-presets/"+item.path("id").asText();
+        http(get(ADMIN+"mix-presets/"+personal.path("id").asText()),admin,null,404);
+        assertThat(http(get(route),null,null,200).path("total").asInt()).isZero();
+        var publish=Map.of("tracks",tracks,"title","公开","status","published","version",1);
+        http(put(edit),admin,publish,200);
+        http(put(edit),admin,publish,409);
+        var list=http(get(route),null,null,200);
+        assertThat(list.path("total").asInt()).isEqualTo(1);
+        assertThat(list.at("/items/0/backgroundAssetReady").booleanValue()).isFalse();
+        var body=Map.of("kind","noise","plannedSeconds",60,"mixPresetId",item.path("id").asText(),"tracks",List.of());
+        http(post("/api/v1/practice/sessions").header("Idempotency-Key",id()),user,body,403);
+        grant("membership",null,null);
+        http(post("/api/v1/practice/sessions").header("Idempotency-Key",id()),user,body,200);
+        jdbc.update("UPDATE media_asset SET review_status='rejected' WHERE id=?",file.path("assetId").asText());
+        assertThat(http(get(route),null,null,200).path("total").asInt()).isZero();
+        http(post("/api/v1/practice/sessions").header("Idempotency-Key",id()),user,body,404);
+        http(delete(edit),admin,Map.of("reason","归档","version",2),200);
+        assertThat(http(get(ADMIN+"mix-presets").param("status","archived"),admin,null,200).path("total").asInt()).isEqualTo(1);
+    }
+
     @Test void paidNoiseRequiresLiveMembershipAndBindingToSameUserTrackAndFile() throws Exception {
         var body=soundInput("noise","member","approved");
         String noise=create("noises",body).path("id").asText();

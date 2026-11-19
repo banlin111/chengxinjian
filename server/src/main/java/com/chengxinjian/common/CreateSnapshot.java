@@ -40,12 +40,23 @@ public class CreateSnapshot {
     }
     private JsonNode store(String actor,String operation,String key,Object input,
             Consumer<String> authorizeReplay,Supplier<JsonNode> create,boolean sensitive) {
+        jdbc.queryForObject("SELECT id FROM admin_account WHERE id=? FOR UPDATE", String.class, actor);
+        return snapshot(actor,operation,key,input,authorizeReplay,create,sensitive);
+    }
+
+    @Transactional(propagation=Propagation.MANDATORY)
+    public JsonNode user(String actor,String operation,String key,Object input,Supplier<JsonNode> create) {
+        jdbc.queryForObject("SELECT id FROM app_user WHERE id=? FOR UPDATE", String.class, actor);
+        return snapshot(actor,operation,key,input,id -> {},create,false);
+    }
+
+    private JsonNode snapshot(String actor,String operation,String key,Object input,
+            Consumer<String> authorizeReplay,Supplier<JsonNode> create,boolean sensitive) {
         try {
             if (!UUID.fromString(key).toString().equalsIgnoreCase(key)) throw new IllegalArgumentException();
         } catch (IllegalArgumentException ex) {
             throw BusinessException.invalid("Idempotency-Key 必须为 UUID");
         }
-        jdbc.queryForObject("SELECT id FROM admin_account WHERE id=? FOR UPDATE", String.class, actor);
         String hash = TokenSecrets.hash(json.valueToTree(input).toString());
         var records = jdbc.queryForList("SELECT request_hash,result_id,result_json FROM idempotency_record WHERE actor_id=? AND operation=? AND idempotency_key=?",
             actor, operation, key);

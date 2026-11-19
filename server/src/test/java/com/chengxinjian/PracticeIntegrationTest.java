@@ -78,6 +78,7 @@ class PracticeIntegrationTest {
             jdbc.update("DELETE FROM "+table+" WHERE playback_id IN (SELECT id FROM lesson_playback WHERE user_id IN (?,?))",owner,other);
         jdbc.update("DELETE FROM lesson_playback WHERE user_id IN (?,?)",owner,other);
         jdbc.update("DELETE FROM practice_audio_track WHERE session_id IN (SELECT id FROM practice_session WHERE user_id IN (?,?))",owner,other);
+        jdbc.update("DELETE FROM mix_preset WHERE owner_user_id IN (?,?)",owner,other);
         for (String id:fixtureAudio) jdbc.update("DELETE FROM practice_audio WHERE id=?",id);
         for (String id:fixtureAssets) jdbc.update("DELETE FROM media_asset WHERE id=?",id);
         for (String id:fixtureCategories) jdbc.update("DELETE FROM content_category WHERE id=?",id);
@@ -334,6 +335,94 @@ class PracticeIntegrationTest {
         assertThat(send(session,2,"finish",5,20).path("creditedSeconds").asInt()).isEqualTo(20);
         assertThat(stats(token).path("daily").findValues("seconds").stream().map(JsonNode::asInt).toList()).containsExactly(10,10,0);
         assertThat(stats(token).path("totalSeconds").asInt()).isEqualTo(20);
+    }
+
+    @Test void personalMixRestoresAndFreezesOneRevisionAcrossEditsAndRetries() throws Exception {
+        String route="/api/v1/me/mix-presets", a=audioFixture("noise"), b=audioFixture("noise");
+        var tracks=List.of(Map.of("noiseId",b,"volume",0.35),Map.of("noiseId",a,"volume",0.7));
+        var input=Map.of("title","雨夜","tracks",tracks);
+        String key=uuid();
+        var receipts=race(List.of(()->write(route,key,input,200),()->write(route,key,input,200)));
+        var saved=receipts.getFirst();
+        String id=saved.path("id").asText(), detail=route+"/"+id;
+        assertThat(saved).isEqualTo(receipts.getLast());
+        assertThat(saved.has("status")).isFalse();
+        assertThat(http(get(detail),sessions.create(owner).accessToken(),null,200).path("data")).isEqualTo(saved);
+        assertThat(http(get(route),otherToken,null,200).at("/data/total").asInt()).isZero();
+        http(get(detail),otherToken,null,404);
+        http(get(detail),null,null,401);
+        var start=Map.of("kind","noise","plannedSeconds",60,"mixPresetId",id,"tracks",List.of());
+        http(post(BASE).header("Idempotency-Key",uuid()),otherToken,start,404);
+        String startKey=uuid();
+        var session=write(BASE,startKey,start,200);
+        String sid=session.path("id").asText();
+        assertThat(session.path("tracks")).isEqualTo(saved.path("tracks"));
+        var changes=Map.of("title","只听细雨","tracks",List.of(tracks.getLast()),"version",1);
+        http(put(detail),otherToken,changes,404);
+        http(put(detail),token,changes,200);
+        http(put(detail),token,changes,409);
+        write(route,key,Map.of("title","不同","tracks",tracks),409);
+        assertThat(write(route,key,input,200)).isEqualTo(saved);
+        assertThat(write(BASE,startKey,start,200)).isEqualTo(session);
+        var stale=new HashMap<String,Object>(start);stale.put("tracks",tracks);
+        write(BASE,uuid(),stale,409);
+        var newest=write(BASE,uuid(),start,200);
+        assertThat(newest.path("mixPresetVersion").asInt()).isEqualTo(2);
+        assertThat(newest.path("tracks").size()).isEqualTo(1);
+        http(delete(detail),otherToken,Map.of("version",2),404);
+        http(delete(detail),token,Map.of("version",1),409);
+        http(delete(detail),token,Map.of("version",2),200);
+        http(delete(detail),token,Map.of("version",2),200);
+        http(get(detail),token,null,404);
+        write(BASE,uuid(),start,404);
+        var first=bound("noise",a,sid);var second=bound("noise",b,sid);
+        time(15);
+        race(List.of(()->write("/api/v1/playbacks/"+first+"/events",uuid(),played(1,15,15,15),200),
+                     ()->write("/api/v1/playbacks/"+second+"/events",uuid(),played(1,15,15,15),200)));
+        var done=send(sid,1,"finish",15,15);
+        assertThat(done.path("mixPresetVersion").asInt()).isEqualTo(1);
+        assertThat(done.path("creditedSeconds").asInt()).isEqualTo(15);
+        assertThat(stats(token).path("daily").findValues("seconds").stream().map(JsonNode::asInt).toList()).containsExactly(10,5,0);
+    }
+
+    @Test void fiveTrackMixRemainsCoherentWhenPracticeRacesAnEdit() throws Exception {
+        String route="/api/v1/me/mix-presets";
+        var tracks=new ArrayList<Map<String,Object>>();
+        for (int i=0;i<5;i++) tracks.add(Map.of("noiseId",audioFixture("noise"),"volume",i/4.0));
+        var saved=write(route,uuid(),Map.of("title","五轨","tracks",tracks),200);
+        var excess=new ArrayList<>(tracks);excess.add(Map.of("noiseId",audioFixture("noise"),"volume",1));
+        write(route,uuid(),Map.of("title","过多","tracks",excess),400);
+        String id=saved.path("id").asText();
+        var reverse=tracks.reversed();
+        var results=race(List.of(
+            ()->write(BASE,uuid(),Map.of("kind","noise","plannedSeconds",90,"tracks",List.of(),"mixPresetId",id),200),
+            ()->http(put(route+"/"+id),token,Map.of("title","倒序","version",1,"tracks",reverse),200).path("data")));
+        var session=results.getFirst();
+        int version=session.path("mixPresetVersion").asInt();
+        assertThat(version).isIn(1,2);
+        assertThat(session.path("tracks")).isEqualTo(version==1?saved.path("tracks"):results.getLast().path("tracks"));
+        assertThat(session.path("tracks").size()).isEqualTo(5);
+    }
+
+    @Test void privateMixPreservesMuteAndChecksCurrentNoiseAccessAtStart() throws Exception {
+        String route="/api/v1/me/mix-presets", audible=audioFixture("noise"), muted=audioFixture("noise");
+        var silence=Map.of("noiseId",muted,"volume",0);
+        for (var bad : List.of(List.of(),List.of(silence,silence),List.of(Map.of("noiseId",muted,"volume",1.1))))
+            write(route,uuid(),Map.of("title","配方","tracks",bad),400);
+        write(route,uuid(),Map.of("title","配方","tracks",List.of(Map.of("noiseId",audioFixture("meditation"),"volume",1))),404);
+        var tracks=List.of(silence,Map.of("noiseId",audible,"volume",1));
+        var saved=write(route,uuid(),Map.of("title","配方","tracks",tracks),200);
+        var start=Map.of("kind","noise","plannedSeconds",60,"mixPresetId",saved.path("id").asText(),"tracks",List.of());
+        var session=write(BASE,uuid(),start,200).path("id").asText();
+        var ticket=bound("noise",muted,session);
+        time(5);
+        write("/api/v1/playbacks/"+ticket+"/events",uuid(),played(1,5,5,5),200);
+        assertThat(send(session,1,"heartbeat",5,5).path("creditedSeconds").asInt()).isZero();
+        jdbc.update("UPDATE practice_audio SET access_policy='member' WHERE id=?",audible);
+        write(BASE,uuid(),start,403);
+        jdbc.update("UPDATE practice_audio SET status='archived' WHERE id=?",audible);
+        write(BASE,uuid(),start,404);
+        assertThat(http(get(route+"/"+saved.path("id").asText()),token,null,200).at("/data/tracks")).isEqualTo(saved.path("tracks"));
     }
 
     @Test void guidedPracticeNeedsNarrationAndCannotCreditSeekOrPausedTime() throws Exception {

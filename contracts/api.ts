@@ -46,6 +46,11 @@ export interface CoreApi {
   'GET /meditations': Q<T.ContentQuery, T.Page<T.Meditation>>;
   'GET /meditations/{id}': R<T.Meditation>;
   'GET /noises': Q<T.PageQuery & { categoryId?: T.ID }, T.Page<T.Noise>>;
+  'GET /me/mix-presets': Q<T.PageQuery, T.Page<T.SavedMix>>;
+  'GET /me/mix-presets/{id}': R<T.SavedMix>;
+  'POST /me/mix-presets': B<T.SavedMixInput, T.SavedMix>;
+  'PUT /me/mix-presets/{id}': B<T.SavedMixInput & { version: number }, T.SavedMix>;
+  'DELETE /me/mix-presets/{id}': B<{ version: number }, T.OK>;
   'GET /mix-presets': Q<T.PageQuery, T.Page<T.MixPreset>>;
   'POST /playbacks': B<T.PlaybackRequest, T.Playback>;
   'POST /playbacks/{id}/events': B<T.PlaybackEvent, T.PlaybackAck>;

@@ -43,7 +43,9 @@ export interface Lesson extends Versioned { courseId: ID; title: string; sort: n
 export interface Meditation extends Versioned { title: string; summary: string; coverUrl: string; categoryId: ID; teacherId: ID | null; durationSeconds: number; accessPolicy: 'free' | 'member'; access: Access; favorite: boolean; status: PublishStatus }
 export interface Noise extends Versioned { title: string; coverUrl: string; categoryId: ID; durationSeconds: number; accessPolicy: 'free' | 'member'; access: Access; status: PublishStatus }
 export interface MixTrack { noiseId: ID; volume: number }
-export interface MixPreset extends Versioned { title: string; tracks: MixTrack[]; backgroundAssetReady: boolean; status: PublishStatus }
+export interface SavedMixInput { title: string; tracks: MixTrack[] }
+export interface SavedMix extends Versioned, SavedMixInput {}
+export interface MixPreset extends SavedMix { backgroundAssetReady: boolean; status: PublishStatus }
 export interface LearningItem { target: Target; title: string; coverUrl: string; courseId: ID | null; lessonId: ID | null; positionSeconds: number; progressPercent: number; completed: boolean; lastPlayedAt: DateTime }
 export interface Home { greeting: string; continueLearning: LearningItem | null; recommendedCourses: Course[]; recommendedMeditations: Meditation[]; newCourses: Course[]; notices: Notice[]; banners: Banner[]; checkedInToday: boolean; streakDays: number }
 export interface Banner { id: ID; imageUrl: string; title: string; destination: Target | { kind: 'live'; id: ID } | { kind: 'membership'; id: ID }; sort: number }
@@ -55,7 +57,7 @@ export interface Playback { playbackId: ID; url: string; expiresAt: DateTime; du
 export interface PlaybackEvent { eventId: ID; sequence: number; kind: 'playing' | 'pause' | 'seek' | 'ended' | 'background' | 'foreground'; positionSeconds: number; playedDeltaSeconds: number; speed: number; occurredAt: DateTime }
 export interface PlaybackAck { acceptedSequence: number; positionSeconds: number; creditedSeconds: number; completed: boolean }
 export interface PracticeStart { kind: 'guided' | 'timer' | 'noise'; meditationId?: ID; plannedSeconds: number; tracks: MixTrack[]; mixPresetId?: ID; endBellAssetId?: ID }
-export interface Practice extends Versioned { meditationId?: ID; tracks?: MixTrack[]; kind: 'guided' | 'timer' | 'noise'; status: 'active' | 'paused' | 'completed' | 'abandoned'; startedAt: DateTime; endedAt: DateTime | null; plannedSeconds: number; creditedSeconds: number; checkinEligible: boolean; heartbeatSeconds: number }
+export interface Practice extends Versioned { mixPresetId?: ID; mixPresetVersion?: number; meditationId?: ID; tracks?: MixTrack[]; kind: 'guided' | 'timer' | 'noise'; status: 'active' | 'paused' | 'completed' | 'abandoned'; startedAt: DateTime; endedAt: DateTime | null; plannedSeconds: number; creditedSeconds: number; checkinEligible: boolean; heartbeatSeconds: number }
 export interface PracticeEvent { eventId: ID; sequence: number; action: 'heartbeat' | 'pause' | 'resume' | 'finish' | 'abandon'; activeDeltaSeconds: number; occurredAt: DateTime }
 export interface PracticeStats { from: DateOnly; to: DateOnly; totalSeconds: number; completedSessions: number; streakDays: number; checkinDays: number; daily: { date: DateOnly; seconds: number; checkedIn: boolean }[] }
 export interface Comment extends Versioned { target: Target; author: { id: ID; nickname: string; avatarUrl: string | null; isTeacher: boolean }; parentId: ID | null; text: string; status: ReviewStatus | 'deleted'; liked: boolean; likeCount: number; replyCount: number }

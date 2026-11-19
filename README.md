@@ -6,7 +6,7 @@
 
 本文定义目标方案与接口，不代表应用已开发完成。尚无甲方答案的业务数字均需确认，原型中的价格、用户量、奖励及文案不能作为正式配置。本文、接口类型和 OpenAPI 均为同一版本的草案，双方确认后冻结。
 
-**后端当前覆盖 92 个契约方法与路径。** 已实现管理员和微信会话、分类、讲师、私有媒资、编辑审核、课程与课节、会员套餐和人工权益，以及课节播放授权、事件和恢复进度；另有管理员账号/角色/审计、学习历史和课程/课节收藏点赞、普通用户管理与手机号绑定换绑。最新增加公告管理、定时可见性、用户已读与首页公告，见[公告联调交接](docs/notices-integration-2026-11-19.md)。非 local 初始化与验证码适配、备份监测见[阶段六记录](docs/backend-stage6-2026-11-11.md)。当前契约包含 224 个方法与路径，其中播放本阶段仅支持 lesson。已验证的环境、素材和未验收项见[阶段五记录](docs/backend-stage5-2026-11-10.md)和[后端开发说明](docs/backend-development.md)。
+**后端当前覆盖 123 个契约方法与路径。** 本批在现有音频练习上接入公共及个人混音配方，可保存音轨和音量、重登恢复、用指定配方启动会话。媒体播放支持 lesson、meditation、noise。接口与分环境证据见[混音预设交接](docs/mix-presets-integration-2026-11-19.md)和[后端开发说明](docs/backend-development.md)。完整契约含 229 个方法与路径。
 
 **协作接续（2026-11-16）** 普通用户目录、禁用与启用、角色、手机号绑定与换绑的前端接口和供应商办理步骤见[账号联调交接](docs/user-phone-integration-2026-11-16.md)。 小程序首页真实数据接口和前端分支接入方式见[后端开发说明](docs/backend-development.md)。上一阶段实现见[阶段六记录](docs/backend-stage6-2026-11-11.md)；以下交接链接保留起点快照。 后端代码已推送至 `codex/backend-foundation`，见 [完整交接提示词](docs/handoff-prompt-2026-11-11.md) 和 [当前交接核验](docs/handoff-2026-11-11.md)。阶段五代码、自动测试、真实供应商/开发工具联调、隔离云机部署和 SSH 隧道核验的范围分别记录；公网 HTTPS、正式前端、微信真机及整体上线验收仍待完成。接口入口存在不代表对应模块已完整交付。
 
@@ -380,7 +380,7 @@ join 同时校验账号、会员、直播状态，返回短效播放 URL、一�
 
 ### 11.1 HTTP 接口索引
 
-共 **224 个方法/路径组合**，均加 `/api/v1` 前缀。以下类型名在后面的完整类型定义中展开；自动生成的类型别名以 OpenAPI 内定义为准。回调与 WebSocket 见第8节及 SocketEvent。
+共 **229 个方法/路径组合**，均加 `/api/v1` 前缀。以下类型名在后面的完整类型定义中展开；自动生成的类型别名以 OpenAPI 内定义为准。回调与 WebSocket 见第8节及 SocketEvent。
 
 | 方法 | 路径 | 身份 | 查询 | 请求体 | data 返回值 |
 | --- | --- | --- | --- | --- | --- |
@@ -423,6 +423,11 @@ join 同时校验账号、会员、直播状态，返回短效播放 URL、一�
 | `GET` | `/meditations` | 公开/可选登录 | `ContentQuery` | `—` | `Page<Meditation>` |
 | `GET` | `/meditations/{id}` | 公开/可选登录 | `—` | `—` | `Meditation` |
 | `GET` | `/noises` | 公开/可选登录 | `{page, pageSize, categoryId}` | `—` | `Page<Noise>` |
+| `GET` | `/me/mix-presets` | 已登录 | `PageQuery` | `—` | `Page<SavedMix>` |
+| `GET` | `/me/mix-presets/{id}` | 已登录 | `—` | `—` | `SavedMix` |
+| `POST` | `/me/mix-presets` | 已登录 | `—` | `SavedMixInput` | `SavedMix` |
+| `PUT` | `/me/mix-presets/{id}` | 已登录 | `—` | `{title, tracks, version}` | `SavedMix` |
+| `DELETE` | `/me/mix-presets/{id}` | 已登录 | `—` | `{version}` | `OK` |
 | `GET` | `/mix-presets` | 公开/可选登录 | `PageQuery` | `—` | `Page<MixPreset>` |
 | `POST` | `/playbacks` | 已登录 | `—` | `PlaybackRequest` | `Playback` |
 | `POST` | `/playbacks/{id}/events` | 已登录 | `—` | `PlaybackEvent` | `PlaybackAck` |
@@ -657,7 +662,9 @@ export interface Lesson extends Versioned { courseId: ID; title: string; sort: n
 export interface Meditation extends Versioned { title: string; summary: string; coverUrl: string; categoryId: ID; teacherId: ID | null; durationSeconds: number; accessPolicy: 'free' | 'member'; access: Access; favorite: boolean; status: PublishStatus }
 export interface Noise extends Versioned { title: string; coverUrl: string; categoryId: ID; durationSeconds: number; accessPolicy: 'free' | 'member'; access: Access; status: PublishStatus }
 export interface MixTrack { noiseId: ID; volume: number }
-export interface MixPreset extends Versioned { title: string; tracks: MixTrack[]; backgroundAssetReady: boolean; status: PublishStatus }
+export interface SavedMixInput { title: string; tracks: MixTrack[] }
+export interface SavedMix extends Versioned, SavedMixInput {}
+export interface MixPreset extends SavedMix { backgroundAssetReady: boolean; status: PublishStatus }
 export interface LearningItem { target: Target; title: string; coverUrl: string; courseId: ID | null; lessonId: ID | null; positionSeconds: number; progressPercent: number; completed: boolean; lastPlayedAt: DateTime }
 export interface Home { greeting: string; continueLearning: LearningItem | null; recommendedCourses: Course[]; recommendedMeditations: Meditation[]; newCourses: Course[]; notices: Notice[]; banners: Banner[]; checkedInToday: boolean; streakDays: number }
 export interface Banner { id: ID; imageUrl: string; title: string; destination: Target | { kind: 'live'; id: ID } | { kind: 'membership'; id: ID }; sort: number }
@@ -669,7 +676,7 @@ export interface Playback { playbackId: ID; url: string; expiresAt: DateTime; du
 export interface PlaybackEvent { eventId: ID; sequence: number; kind: 'playing' | 'pause' | 'seek' | 'ended' | 'background' | 'foreground'; positionSeconds: number; playedDeltaSeconds: number; speed: number; occurredAt: DateTime }
 export interface PlaybackAck { acceptedSequence: number; positionSeconds: number; creditedSeconds: number; completed: boolean }
 export interface PracticeStart { kind: 'guided' | 'timer' | 'noise'; meditationId?: ID; plannedSeconds: number; tracks: MixTrack[]; mixPresetId?: ID; endBellAssetId?: ID }
-export interface Practice extends Versioned { meditationId?: ID; tracks?: MixTrack[]; kind: 'guided' | 'timer' | 'noise'; status: 'active' | 'paused' | 'completed' | 'abandoned'; startedAt: DateTime; endedAt: DateTime | null; plannedSeconds: number; creditedSeconds: number; checkinEligible: boolean; heartbeatSeconds: number }
+export interface Practice extends Versioned { mixPresetId?: ID; mixPresetVersion?: number; meditationId?: ID; tracks?: MixTrack[]; kind: 'guided' | 'timer' | 'noise'; status: 'active' | 'paused' | 'completed' | 'abandoned'; startedAt: DateTime; endedAt: DateTime | null; plannedSeconds: number; creditedSeconds: number; checkinEligible: boolean; heartbeatSeconds: number }
 export interface PracticeEvent { eventId: ID; sequence: number; action: 'heartbeat' | 'pause' | 'resume' | 'finish' | 'abandon'; activeDeltaSeconds: number; occurredAt: DateTime }
 export interface PracticeStats { from: DateOnly; to: DateOnly; totalSeconds: number; completedSessions: number; streakDays: number; checkinDays: number; daily: { date: DateOnly; seconds: number; checkedIn: boolean }[] }
 export interface Comment extends Versioned { target: Target; author: { id: ID; nickname: string; avatarUrl: string | null; isTeacher: boolean }; parentId: ID | null; text: string; status: ReviewStatus | 'deleted'; liked: boolean; likeCount: number; replyCount: number }
@@ -824,6 +831,11 @@ export interface CoreApi {
   'GET /meditations': Q<T.ContentQuery, T.Page<T.Meditation>>;
   'GET /meditations/{id}': R<T.Meditation>;
   'GET /noises': Q<T.PageQuery & { categoryId?: T.ID }, T.Page<T.Noise>>;
+  'GET /me/mix-presets': Q<T.PageQuery, T.Page<T.SavedMix>>;
+  'GET /me/mix-presets/{id}': R<T.SavedMix>;
+  'POST /me/mix-presets': B<T.SavedMixInput, T.SavedMix>;
+  'PUT /me/mix-presets/{id}': B<T.SavedMixInput & { version: number }, T.SavedMix>;
+  'DELETE /me/mix-presets/{id}': B<{ version: number }, T.OK>;
   'GET /mix-presets': Q<T.PageQuery, T.Page<T.MixPreset>>;
   'POST /playbacks': B<T.PlaybackRequest, T.Playback>;
   'POST /playbacks/{id}/events': B<T.PlaybackEvent, T.PlaybackAck>;

@@ -46,7 +46,7 @@ public class PracticeLedger {
             INSERT INTO practice_played_interval(playback_id,sequence_no,session_id,start_sec,end_sec)
             SELECT ?,?,?,?,? FROM practice_audio_track t JOIN practice_session s ON s.id=t.session_id
             WHERE t.session_id=? AND t.audio_id=? AND s.user_id=? AND s.status IN ('active','paused')
-                AND (t.track_no=-1 OR s.kind='noise')
+                AND (t.track_no=-1 OR (s.kind='noise' AND t.volume>0))
             """,playback,sequence,session,start,end,session,audio,user);
         if (inserted==0) return;
         int remaining=jdbc.queryForObject("SELECT planned_seconds-credited_seconds FROM practice_session WHERE id=?",Integer.class,session);

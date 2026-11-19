@@ -1,5 +1,5 @@
 // Runs in the independent WeChat IDE project. Only non-secret observations leave this function.
-async function exerciseAudio(guide, noise, mode, oldTicket) {
+async function exerciseAudio(guide, noise, mode, oldTicket, exerciseMix) {
   const base = 'http://127.0.0.1:18082/api/v1'
   const key = () => 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
     const n=Math.floor(Math.random()*16)
@@ -24,6 +24,7 @@ async function exerciseAudio(guide, noise, mode, oldTicket) {
     for(const type of ['privacy','user']) agreements.push({type,version:(await call('/agreements/'+type)).version})
     const code=await new Promise((resolve,reject)=>wx.login({success:r=>resolve(r.code),fail:()=>reject(Error('WX_LOGIN'))}))
     auth=await call('/auth/wechat/login','POST',{code,agreements})
+    if (mode==='save' || mode==='mix') return await exerciseMix(mode,oldTicket,{call,post,key,stats})
     if (mode==='revoked') {
       await denied(()=>post('/playbacks/'+oldTicket+'/renew'),'API_403_CONTENT_LOCKED')
       await denied(()=>call('/meditations/'+guide),'API_404_NOT_FOUND')
