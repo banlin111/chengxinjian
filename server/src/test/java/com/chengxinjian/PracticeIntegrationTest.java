@@ -1,0 +1,268 @@
+package com.chengxinjian;
+
+import com.chengxinjian.user.UserSessionService;
+import com.fasterxml.jackson.databind.*;
+import java.sql.Timestamp;
+import java.time.*;
+import java.util.*;
+import java.util.concurrent.*;
+import org.junit.jupiter.api.*;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.context.TestConfiguration;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Primary;
+import org.springframework.http.MediaType;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
+import static org.assertj.core.api.Assertions.*;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
+
+@SpringBootTest(properties={
+    "spring.datasource.url=${TEST_DB_URL:jdbc:h2:mem:practice;MODE=MySQL;DATABASE_TO_LOWER=TRUE;DB_CLOSE_DELAY=-1}",
+    "spring.datasource.username=${TEST_DB_USERNAME:sa}", "spring.datasource.password=${TEST_DB_PASSWORD:}",
+    "spring.datasource.driver-class-name=${TEST_DB_DRIVER:org.h2.Driver}", "app.practice.checkin-seconds=12", "app.practice.rule-version=test-only"})
+@AutoConfigureMockMvc @ActiveProfiles("local")
+class PracticeIntegrationTest {
+    static final String BASE = "/api/v1/practice/sessions";
+    static final String HISTORY = "/api/v1/me/practice/sessions";
+    static final String STATS = "/api/v1/me/practice/stats";
+    static final Instant START = Instant.parse("2026-11-19T15:59:50Z");
+    static class TestClock extends Clock {
+        volatile Instant now = START;
+        public ZoneId getZone() { return ZoneOffset.UTC; }
+        public Clock withZone(ZoneId zone) { return Clock.fixed(now, zone); }
+        public Instant instant() { return now; }
+    }
+    @TestConfiguration static class TimeConfig {
+        @Bean @Primary TestClock practiceClock() { return new TestClock(); }
+    }
+    @Autowired MockMvc mvc;
+    @Autowired JdbcTemplate jdbc;
+    @Autowired ObjectMapper json;
+    @Autowired UserSessionService sessions;
+    @Autowired TestClock clock;
+    String owner, token, other, otherToken;
+
+    String uuid() { return UUID.randomUUID().toString(); }
+    void time(int seconds) { clock.now = START.plusSeconds(seconds); }
+    String user(String id) {
+        var at = Timestamp.from(START);
+        jdbc.update("INSERT INTO app_user(id,nickname,created_at,updated_at,last_login_at) VALUES (?,'练习测试',?,?,?)",
+            id, at, at, at);
+        return sessions.create(id).accessToken();
+    }
+    @BeforeEach void setup() {
+        time(0);
+        owner = uuid();
+        other = uuid();
+        token = user(owner);
+        otherToken = user(other);
+    }
+    @AfterEach void cleanup() {
+        for (String table : List.of("practice_event_request","practice_event"))
+            jdbc.update("DELETE FROM " + table + " WHERE session_id IN (SELECT id FROM practice_session WHERE user_id IN (?,?))", owner, other);
+        for (String table : List.of("practice_checkin_request","practice_checkin","practice_credit","practice_session","user_auth_session"))
+            jdbc.update("DELETE FROM " + table + " WHERE user_id IN (?,?)", owner, other);
+        jdbc.update("DELETE FROM app_user WHERE id IN (?,?)", owner, other);
+    }
+
+    JsonNode http(MockHttpServletRequestBuilder request, String bearer, Object body, int expected) throws Exception {
+        if (bearer != null) request.header("Authorization","Bearer " + bearer);
+        if (body != null) request.contentType(MediaType.APPLICATION_JSON).content(json.writeValueAsBytes(body));
+        return json.readTree(mvc.perform(request).andExpect(status().is(expected)).andReturn().getResponse().getContentAsByteArray());
+    }
+    Map<String,Object> timer(int plan) { return Map.of("kind","timer","plannedSeconds",plan,"tracks",List.of()); }
+    JsonNode write(String route, String key, Object body, int expected) throws Exception {
+        var envelope = http(post(route).header("Idempotency-Key",key), token, body, expected);
+        return expected == 200 ? envelope.path("data") : envelope.path("code");
+    }
+    String start(int plan) throws Exception { return write(BASE,uuid(),timer(plan),200).get("id").asText(); }
+    String events(String id) { return BASE + "/" + id + "/events"; }
+    Map<String,Object> event(int sequence, String action, int delta, int at) {
+        return Map.of("eventId",uuid(),"sequence",sequence,"action",action,"activeDeltaSeconds",delta,"occurredAt",START.plusSeconds(at).toString());
+    }
+    JsonNode send(String id,int seq,String action,int delta,int at) throws Exception {
+        return write(events(id),uuid(),event(seq,action,delta,at),200);
+    }
+    JsonNode stats(String bearer) throws Exception {
+        return http(get(STATS).param("from","2026-11-19").param("to","2026-11-21"),bearer,null,200).path("data");
+    }
+
+    @Test void recoversAcrossLoginAndAttributesSecondsAndCompletionToShanghaiDays() throws Exception {
+        String id = start(100);
+        time(5);
+        send(id,1,"pause",500,5);
+        time(8);
+        token = sessions.create(owner).accessToken();
+        var paused = http(get(BASE+"/"+id),token,null,200).path("data");
+        assertThat(paused.path("status").asText()).isEqualTo("paused");
+        assertThat(paused.path("version").asInt()).isEqualTo(2);
+        send(id,2,"resume",100,8);
+        time(23);
+        var done = send(id,3,"finish",999,23);
+        assertThat(done.path("creditedSeconds").asInt()).isEqualTo(20);
+        assertThat(done.path("checkinEligible").asBoolean()).isTrue();
+        var result = stats(token);
+        assertThat(result.path("daily").findValues("seconds").stream().map(JsonNode::asInt).toList()).containsExactly(7,13,0);
+        assertThat(result.path("totalSeconds").asInt()).isEqualTo(20);
+        assertThat(result.path("completedSessions").asInt()).isEqualTo(1);
+        assertThat(result.path("checkinDays").asInt()).isZero();
+        assertThat(result.path("streakDays").asInt()).isZero();
+        assertThat(http(get(STATS).param("from","2026-11-19").param("to","2026-11-19"),token,null,200)
+            .at("/data/completedSessions").asInt()).isZero();
+        assertThat(http(get(HISTORY).param("from","2026-11-20"),token,null,200).at("/data/total").asInt()).isZero();
+        assertThat(http(get(HISTORY).param("to","2026-11-19"),token,null,200).at("/data/items/0")).isEqualTo(done);
+        assertThat(stats(otherToken).path("totalSeconds").asInt()).isZero();
+    }
+
+    @Test void replaysHistoricalResponsesAndRejectsCollisionsEvenAfterFinish() throws Exception {
+        String createKey=uuid();
+        var initial=write(BASE,createKey,timer(30),200);
+        String id=initial.get("id").asText(), key=uuid(), alias=uuid();
+        time(6);
+        var input=event(1,"heartbeat",6,6);
+        var original=write(events(id),key,input,200);
+        time(10);
+        var finish=event(2,"finish",4,10);
+        var done=write(events(id),uuid(),finish,200);
+        assertThat(write(events(id),uuid(),finish,200)).isEqualTo(done);
+        assertThat(write(events(id),alias,input,200)).isEqualTo(original);
+        assertThat(write(events(id),alias,event(3,"heartbeat",1,10),409).asText()).isEqualTo("IDEMPOTENCY_CONFLICT");
+        assertThat(write(BASE,createKey,timer(30),200)).isEqualTo(initial);
+        assertThat(write(BASE,createKey,timer(31),409).asText()).isEqualTo("IDEMPOTENCY_CONFLICT");
+        var collision=new HashMap<>(input);
+        collision.put("sequence",3);
+        assertThat(write(events(id),uuid(),collision,409).asText()).isEqualTo("IDEMPOTENCY_CONFLICT");
+        assertThat(write(events(id),uuid(),event(1,"pause",6,6),409).asText()).isEqualTo("IDEMPOTENCY_CONFLICT");
+        assertThat(write(events(id),uuid(),event(3,"heartbeat",1,10),409).asText()).isEqualTo("PRACTICE_STATE_CONFLICT");
+    }
+
+    @Test void limitsOfflineBackfillByOccurrenceServerWindowAndPlan() throws Exception {
+        String id=start(70);
+        time(400);
+        assertThat(send(id,1,"heartbeat",999,80).path("creditedSeconds").asInt()).isZero();
+        assertThat(send(id,2,"heartbeat",999,105).path("creditedSeconds").asInt()).isEqualTo(5);
+        assertThat(send(id,3,"heartbeat",999,380).path("creditedSeconds").asInt()).isEqualTo(65);
+        write(events(id),uuid(),event(4,"pause",1,379),400);
+        write(events(id),uuid(),event(4,"pause",1,480),400);
+        assertThat(send(id,4,"pause",1000,401).path("creditedSeconds").asInt()).isEqualTo(70);
+        time(420);
+        var abandoned=send(id,5,"abandon",999,420);
+        assertThat(abandoned.path("status").asText()).isEqualTo("abandoned");
+        assertThat(abandoned.path("creditedSeconds").asInt()).isEqualTo(70);
+        assertThat(stats(token).path("completedSessions").asInt()).isZero();
+    }
+
+    List<JsonNode> race(List<Callable<JsonNode>> requests) throws Exception {
+        var ready=new CountDownLatch(requests.size());
+        var start=new CountDownLatch(1);
+        try (var pool=Executors.newFixedThreadPool(requests.size())) {
+            var futures=new ArrayList<Future<JsonNode>>();
+            for (var call : requests) futures.add(pool.submit(() -> {
+                ready.countDown(); start.await(); return call.call();
+            }));
+            assertThat(ready.await(5,TimeUnit.SECONDS)).isTrue();
+            start.countDown();
+            var results=new ArrayList<JsonNode>();
+            for (var f : futures) results.add(f.get(15,TimeUnit.SECONDS));
+            return results;
+        }
+    }
+
+    @Test void concurrentDevicesAndRetransmissionAllocateEachSecondOnce() throws Exception {
+        String createKey=uuid();
+        var starts=race(List.of(() -> write(BASE,createKey,timer(90),200),() -> write(BASE,createKey,timer(90),200)));
+        assertThat(starts.getFirst()).isEqualTo(starts.getLast());
+        String first=starts.getFirst().get("id").asText(), second=start(90);
+        var a=event(1,"heartbeat",20,20);
+        time(20);
+        var results=race(List.of(() -> write(events(first),uuid(),a,200),() -> write(events(first),uuid(),a,200),
+            () -> send(second,1,"heartbeat",20,20)));
+        assertThat(results.get(0)).isEqualTo(results.get(1));
+        assertThat(results.get(0).path("creditedSeconds").asInt()+results.get(2).path("creditedSeconds").asInt()).isEqualTo(20);
+        assertThat(stats(token).path("daily").findValues("seconds").stream().map(JsonNode::asInt).toList()).containsExactly(10,10,0);
+    }
+
+    @Test void lateDeviceFillsOnlyUnclaimedGapsBetweenEarlierIntervals() throws Exception {
+        String a=start(90), b=start(90);
+        time(45);
+        send(a,1,"pause",5,10);
+        send(a,2,"resume",0,20);
+        send(a,3,"finish",5,25);
+        assertThat(send(b,1,"finish",30,30).path("creditedSeconds").asInt()).isEqualTo(20);
+        assertThat(stats(token).path("totalSeconds").asInt()).isEqualTo(30);
+    }
+
+    @Test void enforcesOwnerStateOrderedDeliveryAndSupportedRequests() throws Exception {
+        String id=start(50);
+        http(get(BASE+"/"+id),null,null,401);
+        http(get(BASE+"/"+id),otherToken,null,404);
+        http(post(events(id)).header("Idempotency-Key",uuid()),otherToken,event(1,"finish",0,0),404);
+        http(get(HISTORY).param("pageSize","101"),token,null,400);
+        http(get(STATS).param("from","2026-01-01").param("to","2027-01-02"),token,null,400);
+        http(get(STATS).param("from","2026-01-02").param("to","2026-01-01"),token,null,400);
+        write(BASE,"bad",timer(1),400);
+        write(BASE,uuid(),timer(0),400);
+        for (String kind : List.of("noise","guided")) {
+            var body=new HashMap<>(timer(5));body.put("kind",kind);
+            assertThat(write(BASE,uuid(),body,503).asText()).isEqualTo("FEATURE_UNAVAILABLE");
+        }
+        var bell=new HashMap<>(timer(5));bell.put("endBellAssetId",uuid());
+        write(BASE,uuid(),bell,503);
+        write(events(id),uuid(),event(1,"resume",0,0),409);
+        write(events(id),uuid(),event(2,"finish",0,0),409);
+        send(id,1,"pause",0,0);
+        write(events(id),uuid(),event(2,"heartbeat",3,0),409);
+        send(id,2,"finish",0,0);
+        jdbc.update("UPDATE app_user SET status='banned' WHERE id=?", owner);
+        http(get(BASE+"/"+id),token,null,403);
+    }
+
+    @Test void explicitCheckinRacesAndCrossDayRetryKeepOneFactAndNoRewards() throws Exception {
+        time(10);
+        String id = start(30), key = uuid();
+        var body = Map.of("practiceSessionId", id);
+        String path = "/api/v1/checkins";
+        assertThat(write(path,key,body,409).asText()).isEqualTo("CHECKIN_NOT_ELIGIBLE");
+        http(post(path).header("Idempotency-Key",uuid()),otherToken,body,404);
+        time(23);
+        send(id,1,"finish",13,23);
+        var pair = race(List.of(() -> write(path,key,body,200), () -> write(path,uuid(),body,200)));
+        assertThat(pair.stream().map(r -> r.path("alreadyCheckedIn").asBoolean()).toList())
+            .containsExactlyInAnyOrder(false,true);
+        for (var checkin : pair) {
+            assertThat(checkin.path("creditedSeconds").asInt()).isEqualTo(13);
+            assertThat(checkin.path("rewards").size()).isZero();
+            assertThat(checkin.path("date").asText()).isEqualTo("2026-11-20");
+        }
+        assertThat(write(path,key,Map.of("practiceSessionId",start(5)),409).asText()).isEqualTo("IDEMPOTENCY_CONFLICT");
+        assertThat(stats(token).path("checkinDays").asInt()).isEqualTo(1);
+        assertThat(stats(token).at("/daily/1/checkedIn").asBoolean()).isTrue();
+        assertThat(http(get("/api/v1/home"),token,null,200).at("/data/checkedInToday").asBoolean()).isTrue();
+        time(86423);
+        token = sessions.create(owner).accessToken();
+        assertThat(write(path,key,body,200)).isEqualTo(pair.getFirst());
+        var calendar = http(get("/api/v1/me/checkins").param("month","2026-11"),token,null,200).path("data");
+        assertThat(calendar.path("dates").toString()).isEqualTo("[\"2026-11-20\"]");
+        assertThat(calendar.path("checkedInToday").asBoolean()).isFalse();
+        assertThat(calendar.path("streakDays").asInt()).isEqualTo(1);
+        String next = start(60);
+        time(86443);
+        send(next,1,"finish",20,86443);
+        assertThat(write(path,uuid(),Map.of("practiceSessionId",next),200).path("streakDays").asInt()).isEqualTo(2);
+        assertThat(stats(token).path("checkinDays").asInt()).isEqualTo(2);
+        time(3*86400+50);
+        token = sessions.create(owner).accessToken();
+        assertThat(http(get("/api/v1/home"),token,null,200).at("/data/streakDays").asInt()).isZero();
+        String later = start(60);
+        time(3*86400+70);
+        send(later,1,"finish",20,3*86400+70);
+        assertThat(write(path,uuid(),Map.of("practiceSessionId",later),200).path("streakDays").asInt()).isEqualTo(1);
+        assertThat(stats(token).path("streakDays").asInt()).isEqualTo(2);
+    }
+}

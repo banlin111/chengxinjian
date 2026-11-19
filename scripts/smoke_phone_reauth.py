@@ -1,4 +1,5 @@
 """Verify real wx.login reauthentication on a disposable loopback MySQL backend."""
+import argparse
 import hashlib
 import json
 import os
@@ -22,6 +23,17 @@ def ide(tool, action, **arguments):
 
 
 def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--practice', action='store_true', help='Exercise timer sessions using real WeChat login')
+    args = parser.parse_args()
+    if args.practice:
+        script = 'smoke_timer_practice.js'
+        name = 'practice-real'
+        expected = dict(credited=True, retried=True, resumed=True, completed=True, history=True, stats=True, noCheckin=True)
+    else:
+        script = 'smoke_phone_reauth.js'
+        name = 'account-real-reauth'
+        expected = dict(sameAccount=True, phoneUnchanged=True, shortProof=True)
     db = load_private(ROOT.parent / '.tools/mysql-test.env', TEST_KEYS)
     if not db['TEST_DB_URL'].startswith('jdbc:mysql://127.0.0.1:33306/cxj_test?'):
         raise RuntimeError('This probe requires the isolated cxj_test schema')
@@ -35,7 +47,8 @@ def main():
     target = ROOT / 'server/target'
     jar = target / 'server-0.1.0-SNAPSHOT.jar'
     http = urllib.request.build_opener(urllib.request.ProxyHandler({}))
-    with (target / 'account-real-runtime.log').open('w') as log:
+    runtime_log = 'practice-real-runtime.log' if args.practice else 'account-real-runtime.log'
+    with (target / runtime_log).open('w') as log:
         process = subprocess.Popen([str(java), '-Duser.timezone=UTC', '-jar', str(jar)], cwd=ROOT / 'server',
                                    stdout=log, stderr=log, env=env)
         try:
@@ -58,13 +71,12 @@ def main():
             if path != 'pages/login/index':
                 raise RuntimeError('Unexpected probe page')
             result = ide('wechat_automator', 'evaluate',
-                         fn_source=(ROOT / 'scripts/smoke_phone_reauth.js').read_text()).get('result')
-            expected = {'sameAccount': True, 'phoneUnchanged': True, 'shortProof': True}
+                         fn_source=(ROOT / 'scripts' / script).read_text()).get('result')
             if result != expected:
-                raise RuntimeError('Wechat reauthentication checks failed')
+                raise RuntimeError(name + ' checks failed')
             evidence = dict(expected, logout=True, jarSha256=hashlib.sha256(jar.read_bytes()).hexdigest())
-            (target / 'account-real-reauth.json').write_text(json.dumps(evidence, indent=2))
-            print('Real WeChat reauthentication and logout verified')
+            (target / (name + '.json')).write_text(json.dumps(evidence, indent=2))
+            print(name + ' and logout verified')
         finally:
             process.terminate()
             process.wait(timeout=20)

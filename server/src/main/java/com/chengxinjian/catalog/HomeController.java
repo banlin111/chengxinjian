@@ -2,6 +2,7 @@ package com.chengxinjian.catalog;
 
 import com.chengxinjian.common.ApiResponse;
 import com.chengxinjian.user.UserPrincipal;
+import com.chengxinjian.practice.PracticeCheckins;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.util.List;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -14,11 +15,13 @@ public class HomeController {
     private final CourseCatalog catalog;
     private final LearningHistory history;
     private final Notices notices;
+    private final PracticeCheckins checkins;
 
-    HomeController(CourseCatalog catalog, LearningHistory history, Notices notices) {
+    HomeController(CourseCatalog catalog, LearningHistory history, Notices notices, PracticeCheckins checkins) {
         this.catalog = catalog;
         this.history = history;
         this.notices = notices;
+        this.checkins = checkins;
     }
 
     record Home(String greeting, ObjectNode continueLearning, List<ObjectNode> recommendedCourses,
@@ -32,7 +35,8 @@ public class HomeController {
         var courses = catalog.newestVisible(user, 7);
         int featured = Math.min(1, courses.size());
         var resume = user == null ? null : history.latestUnfinished(user.id());
+        var checkin = user == null ? new PracticeCheckins.Current(0, false) : checkins.current(user.id());
         return ApiResponse.ok(new Home("你好，涧友", resume, courses.subList(0, featured), List.of(),
-            courses.subList(featured, courses.size()), notices.latest(user, 3), List.of(), false, 0));
+            courses.subList(featured, courses.size()), notices.latest(user, 3), List.of(), checkin.checkedInToday(), checkin.streakDays()));
     }
 }

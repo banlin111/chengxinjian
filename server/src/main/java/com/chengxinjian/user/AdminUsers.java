@@ -3,6 +3,7 @@ package com.chengxinjian.user;
 import com.chengxinjian.auth.AdminPrincipal;
 import com.chengxinjian.catalog.CategoryModels.Page;
 import com.chengxinjian.common.*;
+import com.chengxinjian.practice.PracticeCheckins;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import jakarta.validation.Valid;
@@ -31,20 +32,26 @@ public class AdminUsers {
     private final ObjectMapper json;
     private final Clock clock;
     private final AuditService audit;
-    AdminUsers(JdbcTemplate jdbc,UserService users,ObjectMapper json,Clock clock,AuditService audit) {
+    private final PracticeCheckins checkins;
+    AdminUsers(JdbcTemplate jdbc,UserService users,ObjectMapper json,Clock clock,AuditService audit,PracticeCheckins checkins) {
+        this.checkins=checkins;
         this.jdbc=jdbc; this.users=users; this.json=json; this.clock=clock; this.audit=audit;
     }
     private void global(AdminPrincipal actor) {
         if (!"all".equals(actor.dataScope())) throw BusinessException.forbidden();
     }
     private ObjectNode detail(String id) {
-        var rows=jdbc.query("SELECT version,created_at,updated_at,last_login_at FROM app_user WHERE id=?", (r,n)->{
+        var rows=jdbc.query("""
+                SELECT u.version,u.created_at,u.updated_at,u.last_login_at,
+                (SELECT COALESCE(SUM(p.credited_seconds),0) FROM practice_session p WHERE p.user_id=u.id) AS practice_seconds
+                FROM app_user u WHERE u.id=?
+                """, (r,n)->{
             ObjectNode result=json.valueToTree(users.accountProfile(id));
             var registered=r.getTimestamp("created_at").toInstant().toString();
             return result.put("version",r.getInt("version")).put("registeredAt",registered).put("createdAt",registered)
                 .put("updatedAt",r.getTimestamp("updated_at").toInstant().toString())
                 .put("lastLoginAt",r.getTimestamp("last_login_at").toInstant().toString())
-                .put("totalPracticeSeconds",0).put("streakDays",0);
+                .put("totalPracticeSeconds",r.getLong("practice_seconds")).put("streakDays",checkins.current(id).streakDays());
         },id);
         return rows.stream().findFirst().orElseThrow(BusinessException::notFound);
     }

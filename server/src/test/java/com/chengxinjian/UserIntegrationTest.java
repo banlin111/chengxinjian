@@ -7,6 +7,10 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import java.sql.Timestamp;
 import java.time.Clock;
 import java.time.Instant;
+import java.time.ZoneOffset;
+import org.springframework.boot.test.context.TestConfiguration;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Primary;
 import java.util.*;
 import java.util.concurrent.Callable;
 import java.util.concurrent.Executors;
@@ -40,6 +44,11 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @AutoConfigureMockMvc
 @ActiveProfiles("local")
 class UserIntegrationTest {
+    @TestConfiguration static class TimeConfig {
+        @Bean @Primary Clock userTestClock() {
+            return Clock.fixed(Instant.parse("2026-11-19T08:00:00Z"), ZoneOffset.UTC);
+        }
+    }
     @Autowired MockMvc mvc;
     @Autowired ObjectMapper json;
     @Autowired JdbcTemplate jdbc;
@@ -95,7 +104,7 @@ class UserIntegrationTest {
     }
     private void seedMembership(JsonNode user,String source) {
         jdbc.update("INSERT INTO entitlement_grant(id,user_id,kind,target_id,source,source_id,starts_at) VALUES (?,?,'membership',?,'admin',?,?)",
-            UUID.randomUUID().toString(),user.at("/user/id").asText(),source,source,Timestamp.from(Instant.now().minusSeconds(1)));
+            UUID.randomUUID().toString(),user.at("/user/id").asText(),source,source,Timestamp.from(clock.instant().minusSeconds(1)));
     }
     @Test void smsConflictPreservesBothOwnersSessionsAndIndependentGrants() throws Exception {
         var a=login("a"); var b=otherLogin("b");
@@ -163,7 +172,7 @@ class UserIntegrationTest {
         assertThat(bound.path("phoneMasked").asText()).isEqualTo("138****0003");
         wxBind(a,"needs-proof","13800000004",null,403);
         verify(phoneGateway,never()).exchange("needs-proof");
-        var expired=reauth(a,"exp");jdbc.update("UPDATE phone_reauth SET expires_at=?",Timestamp.from(Instant.now().minusSeconds(3)));
+        var expired=reauth(a,"exp");jdbc.update("UPDATE phone_reauth SET expires_at=?",Timestamp.from(clock.instant().minusSeconds(3)));
         wxBind(a,"expired","13800000004",expired,403);
         when(wechat.exchange("other-identity")).thenReturn(new WechatGateway.Identity("wx0123456789abcdef","not-the-owner",null));
         send(as(post("/api/v1/auth/reauth/wechat"),access(a)),Map.of("purpose","change_phone","code","other-identity"),403);
@@ -231,7 +240,7 @@ class UserIntegrationTest {
         send(as(post("/api/v1/auth/sms"),access(a)),Map.of("phone","13800000001","purpose","change_phone","captchaTicket","ticket"),503);
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM phone_sms_challenge WHERE state='sent'",Integer.class)).isZero();
         var b=new HashMap<>(sms(a,"13800000002","change_phone")); b.put("reauthToken",reauth(a,"wx-again"));
-        jdbc.update("UPDATE phone_sms_challenge SET expires_at=? WHERE id=?",Timestamp.from(Instant.now().minusSeconds(1)),b.get("challengeId"));
+        jdbc.update("UPDATE phone_sms_challenge SET expires_at=? WHERE id=?",Timestamp.from(clock.instant().minusSeconds(1)),b.get("challengeId"));
         send(as(put("/api/v1/me/phone"),access(a)),b,400);
         assertThat(data(send(as(get("/api/v1/me"),access(a)),null,200)).get("phoneMasked").isNull()).isTrue();
     }
@@ -310,7 +319,7 @@ class UserIntegrationTest {
     }
     @Test void refreshRotatesBothTokensAndRejectsReplayEvenWithExpiredAuthorization() throws Exception {
         var u=login("refresh");
-        jdbc.update("UPDATE user_auth_session SET access_expires_at=?",Timestamp.from(Instant.now().minusSeconds(60)));
+        jdbc.update("UPDATE user_auth_session SET access_expires_at=?",Timestamp.from(clock.instant().minusSeconds(60)));
         send(as(get("/api/v1/me"),access(u)),null,401);
         var rotated=data(send(as(post("/api/v1/auth/refresh"),access(u)),Map.of("refreshToken",refresh(u)),200));
         assertThat(access(rotated)).isNotEqualTo(access(u)); assertThat(refresh(rotated)).isNotEqualTo(refresh(u));
@@ -366,7 +375,7 @@ class UserIntegrationTest {
     }
     @Test void currentAgreementIsRequiredAgainAfterVersionUpdateAndHistoryIsRetained() throws Exception {
         login("old");
-        jdbc.update("INSERT INTO agreement_version(agreement_type,version,title,content,effective_at,published,test_only) VALUES ('privacy','approved-v2','privacy','approved content',?,TRUE,FALSE)",Timestamp.from(Instant.now().minusSeconds(1)));
+        jdbc.update("INSERT INTO agreement_version(agreement_type,version,title,content,effective_at,published,test_only) VALUES ('privacy','approved-v2','privacy','approved content',?,TRUE,FALSE)",Timestamp.from(clock.instant().minusSeconds(1)));
         send(post("/api/v1/auth/wechat/login"),Map.of("code","stale","agreements",refs()),409);
         verify(wechat,never()).exchange("stale");
         send(post("/api/v1/auth/wechat/login"),Map.of("code","no-new-consent","agreements",List.of()),400);
@@ -379,7 +388,7 @@ class UserIntegrationTest {
         assertThatThrownBy(()->production.required()).isInstanceOfSatisfying(BusinessException.class,e->assertThat(e.status()).isEqualTo(HttpStatus.SERVICE_UNAVAILABLE));
         assertThatThrownBy(()->production.get(UserModels.AgreementType.privacy,"local-test-2026-11-09"))
             .isInstanceOfSatisfying(BusinessException.class,e->assertThat(e.status()).isEqualTo(HttpStatus.NOT_FOUND));
-        jdbc.update("INSERT INTO agreement_version(agreement_type,version,title,content,effective_at,published,test_only) VALUES ('privacy','future','title','text',?,TRUE,FALSE)",Timestamp.from(Instant.now().plusSeconds(86400)));
+        jdbc.update("INSERT INTO agreement_version(agreement_type,version,title,content,effective_at,published,test_only) VALUES ('privacy','future','title','text',?,TRUE,FALSE)",Timestamp.from(clock.instant().plusSeconds(86400)));
         send(get("/api/v1/agreements/privacy?version=future"),null,404);
         assertThat(data(send(get("/api/v1/agreements/privacy"),null,200)).get("title").asText()).contains("仅本地测试");
     }
@@ -394,7 +403,7 @@ class UserIntegrationTest {
     }
     @Test void refreshExpirationAndWrongAudienceAreRejected() throws Exception {
         var u=login("expires");
-        jdbc.update("UPDATE user_auth_session SET refresh_expires_at=?",Timestamp.from(Instant.now().minusSeconds(60)));
+        jdbc.update("UPDATE user_auth_session SET refresh_expires_at=?",Timestamp.from(clock.instant().minusSeconds(60)));
         send(post("/api/v1/auth/refresh"),Map.of("refreshToken",refresh(u)),401);
         send(as(get("/api/v1/me"),access(u)),null,200);
     }

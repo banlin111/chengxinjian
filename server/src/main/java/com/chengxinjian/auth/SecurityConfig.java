@@ -42,6 +42,8 @@ public class SecurityConfig {
                 .requestMatchers("/api/v1/admin/**").authenticated()
                 .requestMatchers(HttpMethod.POST,"/api/v1/uploads","/api/v1/uploads/*/complete").authenticated()
                 .requestMatchers(HttpMethod.GET,"/api/v1/assets/*").authenticated()
+                .requestMatchers(HttpMethod.POST,"/api/v1/checkins").hasRole("USER")
+                .requestMatchers("/api/v1/practice/sessions", "/api/v1/practice/sessions/*", "/api/v1/practice/sessions/*/events").hasRole("USER")
                 .requestMatchers("/api/v1/playbacks","/api/v1/playbacks/*/events","/api/v1/playbacks/*/renew").hasRole("USER")
                 .requestMatchers("/api/v1/me", "/api/v1/me/**", "/api/v1/auth/logout", "/api/v1/auth/sms", "/api/v1/auth/reauth", "/api/v1/auth/reauth/wechat").hasRole("USER")
                 .anyRequest().denyAll())
