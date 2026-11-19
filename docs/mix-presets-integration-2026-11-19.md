@@ -32,3 +32,17 @@
 ## 复验
 
 先运行仓库规定的 H2、独立 MySQL、Python、契约与 OpenAPI 检查。打包后设置既有 WECHAT_MCP_PYTHON 与 WECHAT_MCP_WRAPPER，用工作区 cos-runtime 的 Python 执行 `scripts/smoke_media_cos.py --loopback-mix`。该模式独占 cxj_test、18082 和独立 IDE 自动化项目，加载 FFmpeg、微信开发身份与测试库配置。对象只在临时回环存储，探针结束后释放。混音断言使用两个原生播放器各自的 onPlay、onTimeUpdate、onEnded、音量和事件时间，核对真实重叠与后台入账。证据位于 server/target/mix-preset-loopback/result.json。
+
+## 2026-11-19 实测记录
+
+| 层级 | 本批证据与边界 |
+| --- | --- |
+| ① 代码 | 从后端 33457cd 接续，实现提交 f8170e93e4ca0168f56526376255054afce46c19。前端仍为 223b2ea4d30d18a9a6ee2655c8b526bbb65fad84。V15 增加配方及有序选轨两张表。个人配方私有，公共配方受编辑发布及审核状态控制；会话固定配方版本、音量和素材。 |
+| ② 自动测试 | H2 与原生 MySQL 8.4 各 141 项，均无失败和跳过；Python 10 项、TypeScript 契约生成（229 个方法、164 个 schema）、OpenAPI 校验通过。新增覆盖双账号隔离、创建并发重试、版本冲突、删除后历史会话、静音轨、五轨顺序和与编辑并发启动、撤审、会员权限，以及用配方启动后多轨跨上海午夜去重。已核对实现提交的 [GitHub Actions](https://github.com/banlin111/chengxinjian/actions/runs/44462270069)，contracts、backend 和打包 HTTP 均成功。后续纯文档提交按当前路径规则不另触发 CI。 |
+| ③ 真实第三方开发联调 | 独立微信 IDE 工程通过真实 wx.login/code2Session，保存后退出，重新登录同一账号从后端恢复。两段独立合成 MP3 由两个 InnerAudioContext 同时播放，音量 0.35、0.70；编辑原配方后，已建会话保留两轨。两个播放器实测重叠 3059 毫秒，各确认 3 秒，并发上报并各自重试后，会话入账 3 秒，日统计增加 3 秒、1 次完成。免费引导与临时会员白噪音回归亦通过。打包服务、真实 MySQL、FFmpeg 及临时回环对象存储共通过 29 项探针检查，测试授权和素材已清理。一次重跑在单轨引导的 ended 等待阶段超时，清理完成；保持机器唤醒后重新跑通全部检查。此次没有调用 COS、短信或购买套餐；较早的真实 COS 课程证据见[课程交接](course-player-integration-2026-11-16.md)。 |
+| ④ 隔离云机及 SSH | 复用已租实例，V14 迁移前已备份并校验异机副本；部署镜像 cxj-api:f8170e9，云库 V15。容器与本机探针 JAR SHA-256 同为 51dc2334ccd3b91593415952b73b088df3a7a2cae173d58bab8b1968453df5e8。重新建立 18081 隧道后有 18 项 HTTP 断言通过，含公开空目录 200、匿名个人读写及后台访问 401、缺批准协议 503。应用仅映射云机回环地址，MySQL healthy 且无宿主端口。云端管理员、用户、配方及练习仍为零，未进行云端已登录的业务写入。迁移后备份已恢复到新演练库，55 张表校验和及 15 次迁移匹配，源库未变化，演练库已移除，异机副本已验证。本机 cxj_dev 只读复核仍为 V9。 |
+| ⑤ 公网 HTTPS | 尚缺业务域名备案、DNS、证书、微信合法域名和对应配置。本次使用 SSH 回环隧道。 |
+| ⑥ 正式前端及真机 | 正式 H5 构建在 Chromium 经隧道读取首页空态。实点“保存当前配方到本机”，移除音轨，再点“恢复本机配方”，还原了 60%、35%，随后打开的仍为助眠演示。业务请求只有 GET /api/v1/home。正式微信包在 IDE 打开首页及混音页，核对“我的配方”和“暂无音源”提示。正式页的服务器保存与播放、Web 管理操作和微信真机本次均未验证。 |
+| ⑦ 上线验收 | 未完成。仍需正式客户端接入、真实授权素材、已核实额度的 COS、公网 HTTPS、批准协议和微信真机前后台、来电、弱网等验收。后台预混成品未生成。 |
+
+本机证据见 server/target/mix-{h2,mysql,python,contract,openapi}.log、mix-preset-loopback/result.json、mix-timeout.json、mix-staging-{before,state,http,prebackup,postbackup,restore}.json、mix-h5-result.json、mix-formal-ide.json 和 mix-ci.json。原始日志及备份保留于 Git 外。
