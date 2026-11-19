@@ -1,7 +1,7 @@
 """Run the packaged backend against an isolated MySQL development database.
 
 Requires Java 21, DB_URL/DB_USERNAME/DB_PASSWORD, LOCAL_ADMIN_PASSWORD and
-LOCAL_CAPTCHA_TICKET. Never point at production; this creates and archives a category.
+LOCAL_CAPTCHA_TICKET. Never point at production; this creates and archives test content.
 """
 import json
 import os
@@ -11,6 +11,7 @@ import time
 import urllib.error
 import urllib.request
 import uuid
+from datetime import datetime, timedelta, timezone
 
 ROOT = Path(__file__).resolve().parents[1]
 SERVER = ROOT / 'server'
@@ -28,13 +29,14 @@ def main():
     env['SERVER_PORT'] = env.get('SMOKE_PORT', '18080')
     java = str(Path(env['JAVA_HOME']) / 'bin' / 'java') if env.get('JAVA_HOME') else 'java'
     base = 'http://127.0.0.1:' + env['SERVER_PORT']
+    opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
 
     def request(path, method='GET', body=None, headers=None):
         h = {'Content-Type': 'application/json'}
         h.update(headers or {})
         req = urllib.request.Request(base + path, method=method, headers=h,
             data=json.dumps(body).encode('utf-8') if body is not None else None)
-        with urllib.request.urlopen(req, timeout=5) as response:
+        with opener.open(req, timeout=5) as response:
             return json.load(response)
 
     with (SERVER / 'target/http-smoke.log').open('w') as log:
@@ -83,8 +85,45 @@ def main():
                 raise AssertionError('Public teacher response leaked admin-only fields')
             request('/api/v1/admin/content/teachers/' + teacher['id'], 'DELETE',
                 {'reason': '验证完成归档', 'version': teacher['version']}, teacher_headers)
+            notice_headers = {**headers, 'Idempotency-Key': str(uuid.uuid4())}
+            notice_path = '/api/v1/admin/content/notices'
+            notice_body = {'title': 'HTTP公告验证', 'content': '仅供隔离开发数据库验证，完成后归档。',
+                           'publishedAt': (datetime.now(timezone.utc) + timedelta(days=1)).isoformat(),
+                           'status': 'published'}
+            notice = request(notice_path, 'POST', notice_body, notice_headers)['data']
+            target = notice['id']
+
+            def hidden_notice():
+                try:
+                    request('/api/v1/notices/' + target)
+                except urllib.error.HTTPError as error:
+                    if error.code != 404:
+                        raise
+                else:
+                    raise AssertionError('Hidden notice remains visible')
+
+            try:
+                if request(notice_path, 'POST', notice_body, notice_headers)['data'] != notice:
+                    raise AssertionError('Notice replay changed its snapshot')
+                hidden_notice()
+                notice_body['publishedAt'] = (datetime.now(timezone.utc) - timedelta(seconds=1)).isoformat()
+                notice = request(notice_path + '/' + target, 'PUT',
+                    {**notice_body, 'version': notice['version']}, notice_headers)['data']
+                public = request('/api/v1/notices/' + target)['data']
+                if set(public) != {'id', 'title', 'content', 'publishedAt', 'read'} or public['read']:
+                    raise AssertionError('Unexpected public notice fields/read state')
+                for path, field in [('/api/v1/notices', 'items'), ('/api/v1/home', 'notices')]:
+                    if not any(n['id'] == target for n in request(path)['data'][field]):
+                        raise AssertionError('Published notice missing from ' + path)
+            finally:
+                current = request(notice_path + '/' + target, headers=notice_headers)['data']
+                request(notice_path + '/' + target, 'DELETE',
+                    {'reason': 'HTTP验证完成归档', 'version': current['version']}, notice_headers)
+            hidden_notice()
+            if any(n['id'] == target for n in request('/api/v1/home')['data']['notices']):
+                raise AssertionError('Archived notice remains on home')
             request('/api/v1/admin/auth/logout', 'POST', {'refreshToken': auth['refreshToken']}, headers)
-            print('Packaged backend + MySQL + HTTP workflow: PASS')
+            print('Packaged backend + MySQL + HTTP category/teacher/notice workflows: PASS (local profile; no provider or device acceptance)')
         finally:
             process.terminate()
             try:

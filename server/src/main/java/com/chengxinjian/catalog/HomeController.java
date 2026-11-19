@@ -13,14 +13,16 @@ import org.springframework.web.bind.annotation.RestController;
 public class HomeController {
     private final CourseCatalog catalog;
     private final LearningHistory history;
+    private final Notices notices;
 
-    HomeController(CourseCatalog catalog, LearningHistory history) {
+    HomeController(CourseCatalog catalog, LearningHistory history, Notices notices) {
         this.catalog = catalog;
         this.history = history;
+        this.notices = notices;
     }
 
     record Home(String greeting, ObjectNode continueLearning, List<ObjectNode> recommendedCourses,
-                List<ObjectNode> recommendedMeditations, List<ObjectNode> newCourses, List<ObjectNode> notices,
+                List<ObjectNode> recommendedMeditations, List<ObjectNode> newCourses, List<Notices.Notice> notices,
                 List<ObjectNode> banners, boolean checkedInToday, int streakDays) {}
 
     @GetMapping("/api/v1/home")
@@ -31,6 +33,6 @@ public class HomeController {
         int featured = Math.min(1, courses.size());
         var resume = user == null ? null : history.latestUnfinished(user.id());
         return ApiResponse.ok(new Home("你好，涧友", resume, courses.subList(0, featured), List.of(),
-            courses.subList(featured, courses.size()), List.of(), List.of(), false, 0));
+            courses.subList(featured, courses.size()), notices.latest(user, 3), List.of(), false, 0));
     }
 }
