@@ -47,3 +47,34 @@ V10 仅新增 `content_notice`、`user_notice_read` 及索引和外键，不改 
 2026-11-19 本机实际执行：H2 与 MySQL 8.4.11 全量各 126 项通过（均无跳过，其中公告新增 8 项）；Python 配置与运维测试 10 项通过；`npm run check`、OpenAPI 校验、打包 JAR 在隔离 `cxj_test` / 18084 的分类、讲师、公告 HTTP 流程通过。MySQL 原先停止，本轮从原数据目录恢复，未初始化新目录，未迁移或清理 `cxj_dev`。打包探针已停止、会话已退出、测试公告已归档。证据在忽略的 `server/target/notices-{full-h2,full-mysql,python,contract,openapi,http}.log`。
 
 这些结果属于代码与自动化/本机 HTTP 检查。本轮未执行真实微信、COS、短信、验证码交互，也未执行正式前端或真机公告验收；原课程、账号和权益用例随全量回归通过，不代表长课程、购买支付等真实业务验收。
+
+实现提交 `3b3554d097719d9feb403d34eacfba269bc5a289` 的 [GitHub Actions 44442047102](https://github.com/banlin111/chengxinjian/actions/runs/44442047102) 在本轮实际读取为 `completed/success`，`contracts` 与 `backend` 均成功；后者包含 H2、MySQL 与打包 HTTP 检查。后续仅补交接文档的提交不触发当前后端路径规则，不把代码提交 CI 的结果宣称为文档提交另跑了一轮 CI。
+
+## 隔离云机部署、恢复和回滚实测
+
+- 实现提交 `3b3554d097719d9feb403d34eacfba269bc5a289`，发布目录 `/opt/cxj/releases/3b3554d`，镜像 `cxj-api:3b3554d`。本机 JAR、上传 JAR、容器内 JAR 的 SHA256 均为 `c69f06407a26aaddd3971a8bd2bdfdf474f5695d296cfb6e4994bf557674f779`。
+- 迁移前备份 `cxj-auto-20261119T020445196793Z.sql.gz`，SHA256 `fe7e12158ae967d3f0e5ab8dc91b1a8383db64ecfb61ad00f2ac8623bb5c5711`，完成异机拉取和校验后部署。云端 V1–V10 全部成功。
+- 迁移后备份 `cxj-auto-20261119T020742168649Z.sql.gz`，SHA256 `98a81cb91d5738875becbce8913ea47777adaae6d0dac6433c8145bf596ef6ab`。恢复到新的隔离演练库，43 张表 CHECKSUM 和 V1–V10 一致，源库未改变，演练库已删除；异机副本 SHA256 再次核对。
+- V10 只有两个新增表，不修改旧列或权限。实际短暂切回 `cxj-api:2563fa6`，在保留 V10 的数据库上启动并通过 readiness、课程目录检查，再恢复 `cxj-api:3b3554d`。最终复核新镜像、JAR 摘要、迁移、readiness、公告和首页响应均正确。此次回滚演练只覆盖无业务写入的隔离环境启动/兼容性；旧版不提供公告 API，不代表含真实新业务写入时可无条件回滚。
+- 云端仍为 `mysql,prod`，非 root `app`、只读根文件系统、API 仅绑定 `127.0.0.1:18080`，没有对公网开放 HTTP。没有注入本地测试协议、管理员、固定验证码或真实供应商密钥。当前管理员、用户、公告、读记录均为 0，不能把空数据公开响应当成云端完整后台发布/用户已读验收。
+- 重新建立本机 `18081` SSH 隧道（旧监听不存在），经绕过代理的 HTTP 检查：readiness 200/UP；公告、首页、课程、套餐 200/OK；不存在公告 404/NOT_FOUND；匿名管理列表与标记已读 401/UNAUTHENTICATED；隐私协议 503/AGREEMENTS_UNAVAILABLE，仍拒绝缺批准协议的正式注册。
+
+证据保存在忽略的 `server/target/notices-staging-{prebackup,postbackup,restore,http,final}.json`、`notices-{prebackup,postbackup}-pull.json`、`notices-deploy.log`、`notices-staging-rollback.log`。这些是本机证据，不随 Git 分发；换电脑需依据本文记录或重新验证。
+
+本机 `cxj_dev` 经只读查询仍为 V9，本轮没有运行本机开发应用；下次用新版启动开发服务前必须先备份 `cxj_dev`。本机 MySQL 已恢复监听 33306，`cxj_test` 为 V10；18084 打包探针已退出。云端当前镜像是本批代码版本。
+
+## 仍需验收与后续工作
+
+| 层级 | 本批实际状态 |
+| --- | --- |
+| 代码 | 公告 8 个入口、首页聚合、V10 已实现并提交 |
+| 自动测试 | H2 / 原生 MySQL 各 126 项、Python 10 项、契约与打包 HTTP 检查通过 |
+| 真实第三方开发联调 | 本批未重跑；没有真实短信或小程序验证码成功发送/校验的新证据 |
+| 隔离云机 / SSH 隧道 | 部署、基础响应、迁移、备份恢复与上述回滚范围通过；认证业务全流程尚未在云端验证 |
+| 公网 HTTPS | 未验收，域名仍缺 |
+| 正式前端及微信真机 | 公告尚待前端接入；课程真机与授权长素材验收仍未完成 |
+| 上线验收 | 未完成 |
+
+后续可继续独立推进练习会话/白噪音/混音、搜索和运营配置等后端；涉及打卡阈值、完成口径及奖励的正式规则仍需确认。账号密码/找回/注销、支付与订单、直播等剩余范围仍按 README 保留。不得用本批公告进度折算整个产品完成率。
+
+实名资质按用户安排由甲方后续配合。短信免费 200 条已于 11 月 16 日领取（本批未复查剩余条数），签名、模板及真机插件验证缺项见[账号交接](user-phone-integration-2026-11-16.md)；本批没有发送或付费，不重新购买。域名、批准协议、授权课程素材仍需后续提供。
