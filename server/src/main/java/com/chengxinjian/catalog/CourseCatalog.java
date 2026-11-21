@@ -25,6 +25,9 @@ public class CourseCatalog {
         """;
     static final String LESSON_FROM=" FROM content_lesson l JOIN media_asset a ON a.id=l.asset_id JOIN content_course c ON c.id=l.course_id JOIN content_teacher t ON t.id=c.teacher_id JOIN content_category k ON k.id=c.category_id JOIN media_asset cover ON cover.id=c.cover_asset_id ";
     static final String LESSON_VISIBLE="l.status='published' AND a.status='ready' AND a.review_status='approved' AND a.purpose='course_media'";
+    public static String visibleCourseIds() {
+        return "SELECT c.id "+COURSE_FROM+" WHERE "+COURSE_VISIBLE;
+    }
     private static final String TOTALS="""
         LEFT JOIN (SELECT l.course_id,COUNT(*) AS lessons,SUM(a.duration_seconds) AS duration,
                MAX(CASE WHEN tr.state='ready' THEN l.trial_seconds ELSE 0 END) AS trial_seconds

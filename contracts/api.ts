@@ -71,7 +71,7 @@ export interface CoreApi {
   'GET /me/practice/stats': Q<{ from: T.DateOnly; to: T.DateOnly }, T.PracticeStats>;
   'POST /checkins': B<{ practiceSessionId: T.ID }, T.Checkin>;
   'GET /me/checkins': Q<{ month: string }, { dates: T.DateOnly[]; streakDays: number; checkedInToday: boolean }>;
-  'GET /rewards': Q<T.PageQuery, T.Page<T.RewardEligibility>>;
+  'GET /rewards': Q<T.PageQuery & { submissionId?: T.ID }, T.Page<T.RewardEligibility>>;
   'POST /reward-claims': B<{ ruleId: T.ID; submissionId?: T.ID; addressId?: T.ID }, T.RewardClaim>;
   'GET /me/reward-claims': Q<T.PageQuery, T.Page<T.RewardClaim>>;
   'GET /reward-claims/{id}': R<T.RewardClaim>;
@@ -154,6 +154,7 @@ export interface CoreApi {
   'POST /admin/comments/{id}/review': B<T.ReviewDecision, T.Comment>;
   'DELETE /admin/comments/{id}': B<T.Reason, T.OK>;
   'GET /admin/submissions': Q<T.ModerationQueueQuery, T.Page<T.Submission>>;
+  'POST /admin/submissions/{id}/preview': R<{ url: string; expiresAt: T.DateTime }>;
   'POST /admin/submissions/{id}/review': B<T.ReviewDecision, T.Submission>;
   'GET /admin/assets/{id}/processing': R<T.AssetProcessing>;
   'POST /admin/assets/{id}/processing/retry': B<T.Reason, T.Asset>;

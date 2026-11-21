@@ -100,7 +100,7 @@ for key,s in raw['properties'].items():
             if name in ('from','to','registeredFrom','registeredTo'): v['format']='date'
             if name=='month': v['pattern']=r'^\d{4}-\d{2}$'
             params.append({'name':name,'in':'query','required':name in q.get('required',[]),'schema':v})
-    if method=='POST' and path not in public_auth and path not in ('/auth/logout','/admin/auth/logout','/admin/assets/{id}/preview'):
+    if method=='POST' and path not in public_auth and path not in ('/auth/logout','/admin/auth/logout','/admin/assets/{id}/preview','/admin/submissions/{id}/preview'):
         params.append({'name':'Idempotency-Key','in':'header','required':True,'schema':{'type':'string','format':'uuid'},'description':'相同意图重试复用，同键不同体返回409'})
     result=convert(parts['r'])
     env={'type':'object','required':['code','message','data','requestId','serverTime'],'properties':{

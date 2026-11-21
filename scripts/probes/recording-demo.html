@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>澄心涧 · 练习录制与课程奖励</title>
+<style>
+:root{color-scheme:light;font-family:"Source Sans 3","PingFang SC",sans-serif;background:#f6f5ee;color:#153f39}
+body{max-width:46rem;padding:clamp(1rem,5vw,3rem);margin:4vh auto}
+h1{font-size:clamp(2rem,6vw,3.2rem);line-height:1.16;margin:.5em 0}h2{font-size:1.6rem}
+p{line-height:1.8}section{padding:1.5rem;background:white;border-left:4px solid #397565}
+footer{margin-top:1.4rem}button{font:inherit;border:1px solid #376556;border-radius:.5rem;padding:.5rem 1.2rem;background:white;color:#173a31;cursor:pointer}button:disabled{opacity:.45}
+small{color:#4a5a53}nav{display:flex;gap:1em;align-items:center;margin:1rem 0}
+</style>
+<main>
+<h1>练习录制与课程奖励</h1>
+<p>澄心涧开发演示 · 微信开发者工具实测回放<br><small>真实开发身份与后端接口，本机私有存储，合成音频。</small></p>
+<article aria-live="polite"><!--steps--></article>
+<nav hidden><button id="prev">上一步</button><span id="position"></span><button id="next">下一步</button></nav>
+<footer hidden><b>课程权益 <!--grants--> 份</b><p>授权课节下载成功，共 <!--bytes--> 字节。</p></footer>
+</main>
+<script>
+const steps=Array.from(document.querySelectorAll('section'))
+const nav=document.querySelector('nav'), prev=document.querySelector('#prev'), next=document.querySelector('#next')
+let current=0
+function show() {
+  steps.forEach((step,i)=>{step.hidden=i!==current})
+  document.querySelector('#position').textContent=(current+1)+' / '+steps.length
+  prev.disabled=current===0
+  next.disabled=current===steps.length-1
+  document.querySelector('footer').hidden=!next.disabled
+}
+prev.onclick=()=>{current--;show()}
+next.onclick=()=>{current++;show()}
+nav.hidden=false
+show()
+</script>
+</html>

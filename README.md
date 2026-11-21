@@ -6,7 +6,7 @@
 
 本文定义目标方案与接口，不代表应用已开发完成。尚无甲方答案的业务数字均需确认，原型中的价格、用户量、奖励及文案不能作为正式配置。本文、接口类型和 OpenAPI 均为同一版本的草案，双方确认后冻结。
 
-**后端当前覆盖 123 个契约方法与路径。** 本批在现有音频练习上接入公共及个人混音配方，可保存音轨和音量、重登恢复、用指定配方启动会话。媒体播放支持 lesson、meditation、noise。接口与分环境证据见[混音预设交接](docs/mix-presets-integration-2026-11-19.md)和[后端开发说明](docs/backend-development.md)。完整契约含 229 个方法与路径。
+**后端当前覆盖 139 个契约方法与路径，完整契约共 230 个。** 录制支持本人提交、审核员私有试听、驳回重提、资格查询与课程发放。正式奖励规则默认关闭。接口与演示范围见[录制课程奖励交接](docs/recording-rewards-integration-2026-11-21.md)、[混音预设交接](docs/mix-presets-integration-2026-11-19.md)和[后端开发说明](docs/backend-development.md)。
 
 **协作接续（2026-11-16）** 普通用户目录、禁用与启用、角色、手机号绑定与换绑的前端接口和供应商办理步骤见[账号联调交接](docs/user-phone-integration-2026-11-16.md)。 小程序首页真实数据接口和前端分支接入方式见[后端开发说明](docs/backend-development.md)。上一阶段实现见[阶段六记录](docs/backend-stage6-2026-11-11.md)；以下交接链接保留起点快照。 后端代码已推送至 `codex/backend-foundation`，见 [完整交接提示词](docs/handoff-prompt-2026-11-11.md) 和 [当前交接核验](docs/handoff-2026-11-11.md)。阶段五代码、自动测试、真实供应商/开发工具联调、隔离云机部署和 SSH 隧道核验的范围分别记录；公网 HTTPS、正式前端、微信真机及整体上线验收仍待完成。接口入口存在不代表对应模块已完整交付。
 
@@ -380,7 +380,7 @@ join 同时校验账号、会员、直播状态，返回短效播放 URL、一�
 
 ### 11.1 HTTP 接口索引
 
-共 **229 个方法/路径组合**，均加 `/api/v1` 前缀。以下类型名在后面的完整类型定义中展开；自动生成的类型别名以 OpenAPI 内定义为准。回调与 WebSocket 见第8节及 SocketEvent。
+共 **230 个方法/路径组合**，均加 `/api/v1` 前缀。以下类型名在后面的完整类型定义中展开；自动生成的类型别名以 OpenAPI 内定义为准。回调与 WebSocket 见第8节及 SocketEvent。
 
 | 方法 | 路径 | 身份 | 查询 | 请求体 | data 返回值 |
 | --- | --- | --- | --- | --- | --- |
@@ -448,7 +448,7 @@ join 同时校验账号、会员、直播状态，返回短效播放 URL、一�
 | `GET` | `/me/practice/stats` | 已登录 | `{from, to}` | `—` | `PracticeStats` |
 | `POST` | `/checkins` | 已登录 | `—` | `{practiceSessionId}` | `Checkin` |
 | `GET` | `/me/checkins` | 已登录 | `{month}` | `—` | `{dates, streakDays, checkedInToday}` |
-| `GET` | `/rewards` | 已登录 | `PageQuery` | `—` | `Page<RewardEligibility>` |
+| `GET` | `/rewards` | 已登录 | `{page, pageSize, submissionId}` | `—` | `Page<RewardEligibility>` |
 | `POST` | `/reward-claims` | 已登录 | `—` | `{ruleId, submissionId, addressId}` | `RewardClaim` |
 | `GET` | `/me/reward-claims` | 已登录 | `PageQuery` | `—` | `Page<RewardClaim>` |
 | `GET` | `/reward-claims/{id}` | 已登录 | `—` | `—` | `RewardClaim` |
@@ -530,6 +530,7 @@ join 同时校验账号、会员、直播状态，返回短效播放 URL、一�
 | `POST` | `/admin/comments/{id}/review` | 后台权限 | `—` | `ReviewDecision` | `Comment` |
 | `DELETE` | `/admin/comments/{id}` | 后台权限 | `—` | `Reason` | `OK` |
 | `GET` | `/admin/submissions` | 后台权限 | `ModerationQueueQuery` | `—` | `Page<Submission>` |
+| `POST` | `/admin/submissions/{id}/preview` | 后台权限 | `—` | `—` | `{url, expiresAt}` |
 | `POST` | `/admin/submissions/{id}/review` | 后台权限 | `—` | `ReviewDecision` | `Submission` |
 | `GET` | `/admin/assets/{id}/processing` | 后台权限 | `—` | `—` | `AssetProcessing` |
 | `POST` | `/admin/assets/{id}/processing/retry` | 后台权限 | `—` | `Reason` | `Asset` |
@@ -856,7 +857,7 @@ export interface CoreApi {
   'GET /me/practice/stats': Q<{ from: T.DateOnly; to: T.DateOnly }, T.PracticeStats>;
   'POST /checkins': B<{ practiceSessionId: T.ID }, T.Checkin>;
   'GET /me/checkins': Q<{ month: string }, { dates: T.DateOnly[]; streakDays: number; checkedInToday: boolean }>;
-  'GET /rewards': Q<T.PageQuery, T.Page<T.RewardEligibility>>;
+  'GET /rewards': Q<T.PageQuery & { submissionId?: T.ID }, T.Page<T.RewardEligibility>>;
   'POST /reward-claims': B<{ ruleId: T.ID; submissionId?: T.ID; addressId?: T.ID }, T.RewardClaim>;
   'GET /me/reward-claims': Q<T.PageQuery, T.Page<T.RewardClaim>>;
   'GET /reward-claims/{id}': R<T.RewardClaim>;
@@ -939,6 +940,7 @@ export interface CoreApi {
   'POST /admin/comments/{id}/review': B<T.ReviewDecision, T.Comment>;
   'DELETE /admin/comments/{id}': B<T.Reason, T.OK>;
   'GET /admin/submissions': Q<T.ModerationQueueQuery, T.Page<T.Submission>>;
+  'POST /admin/submissions/{id}/preview': R<{ url: string; expiresAt: T.DateTime }>;
   'POST /admin/submissions/{id}/review': B<T.ReviewDecision, T.Submission>;
   'GET /admin/assets/{id}/processing': R<T.AssetProcessing>;
   'POST /admin/assets/{id}/processing/retry': B<T.Reason, T.Asset>;

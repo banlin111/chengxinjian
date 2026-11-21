@@ -71,6 +71,11 @@ class PracticeIntegrationTest {
         token = user(owner);
         otherToken = user(other);
     }
+    @Test void unapprovedRewardsOffByDefault() throws Exception {
+        assertThat(http(get("/api/v1/rewards"),token,null,200).path("total").asInt()).isZero();
+        assertThat(org.springframework.test.util.ReflectionTestUtils.getField(rules,"enabled")).isEqualTo(false);
+    }
+    @Autowired com.chengxinjian.rewards.RecordingRules rules;
     @AfterEach void cleanup() {
         for (String table : List.of("practice_event_request","practice_event"))
             jdbc.update("DELETE FROM " + table + " WHERE session_id IN (SELECT id FROM practice_session WHERE user_id IN (?,?))", owner, other);

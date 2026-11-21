@@ -10,3 +10,8 @@
 <view class="status">{{status}}</view>
 <video wx:if="{{fixtureFile}}" id="fixture-video" src="{{fixtureFile}}" autoplay="{{true}}" muted controls="{{false}}"
   bindplay="fixturePlayed" bindtimeupdate="fixtureTime" bindended="fixtureEnded" binderror="fixtureFailed" />
+
+<view wx:if="{{rewardDemo.length}}">
+  <view>练习录制与课程奖励 · 本机开发演示</view>
+  <view wx:for="{{rewardDemo}}" wx:key="*this" class="note">{{item}}</view>
+</view>

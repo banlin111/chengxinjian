@@ -24,7 +24,7 @@ import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-@SpringBootTest(properties={
+@SpringBootTest(properties={"RECORDING_REWARDS_ENABLED=true",
     "spring.datasource.url=${TEST_DB_URL:jdbc:h2:mem:courses;MODE=MySQL;DATABASE_TO_LOWER=TRUE;DB_CLOSE_DELAY=-1}",
     "spring.datasource.username=${TEST_DB_USERNAME:sa}","spring.datasource.password=${TEST_DB_PASSWORD:}",
     "spring.datasource.driver-class-name=${TEST_DB_DRIVER:org.h2.Driver}",
@@ -452,5 +452,99 @@ class CourseIntegrationTest {
         http(delete(ADMIN+"noises/"+noise),admin,Map.of("reason","归档","version",2),200);
         assertThat(http(get("/api/v1/noises").param("categoryId",replacement.path("categoryId").asText()),null,null,200).path("total").asInt()).isZero();
         http(post(PLAY).header("Idempotency-Key",id()),user,req,404);
+    }
+
+    record Recording(String owner,String token,String session,String asset) {}
+    private Recording recording(String owner,String token) {
+        String session=id(),asset=id();
+        jdbc.update("""
+            INSERT INTO practice_session(id,user_id,create_key,request_hash,create_snapshot,status,planned_seconds,credited_seconds,started_sec,last_event_sec,updated_sec)
+            VALUES (?,?,?,?,'{}','completed',60,2,1,3,3)
+            """,session,owner,id(),"a".repeat(64));
+        jdbc.update("""
+            INSERT INTO media_asset(id,purpose,filename,mime_type,size_bytes,duration_seconds,sha256,object_key,status,owner_user_id,created_at,updated_at)
+            VALUES (?,'practice_recording','practice.mp3','audio/mpeg',100,2,?,?,'ready',?,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)
+            """,asset,com.chengxinjian.auth.TokenSecrets.hash(asset),"validated/"+asset+"/source",owner);
+        return new Recording(owner,token,session,asset);
+    }
+    private String submit(Recording rec) throws Exception {
+        return http(post("/api/v1/practice/submissions").header("Idempotency-Key",id()),rec.token(),
+            Map.of("practiceSessionId",rec.session(),"assetId",rec.asset(),"text","练习"),200).path("id").asText();
+    }
+    private void review(String submission,String decision,int expected) throws Exception {
+        http(post("/api/v1/admin/submissions/"+submission+"/review").header("Idempotency-Key",id()),admin,
+            Map.of("version",1,"decision",decision,"reason","试听后确认"),expected);
+    }
+    private void recordingPermissions(boolean add) {
+        for (String perm:List.of("rewards:manage","moderation:review")) {
+            if (add) jdbc.update("INSERT INTO admin_role_permission SELECT 'role-content-manager',? WHERE NOT EXISTS (SELECT 1 FROM admin_role_permission WHERE role_id='role-content-manager' AND permission_code=?)",perm,perm);
+            else jdbc.update("DELETE FROM admin_role_permission WHERE role_id='role-content-manager' AND permission_code=?",perm);
+        }
+    }
+    private ObjectNode ruleInput(String course) {
+        return json.createObjectNode().put("name","测试课程奖励").put("trigger","submission").put("kind","course")
+            .put("courseId",course).put("coverAssetId",cover).put("stock",1).put("perUserLimit",1)
+            .put("requiresReview",true).put("status","published").put("startAt",Instant.now().minusSeconds(60).toString());
+    }
+    private MockHttpServletRequestBuilder issue() {return post("/api/v1/reward-claims").header("Idempotency-Key",id());}
+    @Test void reviewedRecordingCanIssueOnlyOnceAcrossRetriesAndRules() throws Exception {
+        recordingPermissions(true);
+        try {
+            var rec=recording(uid,user);
+            String course=create("courses",course("purchase")).path("id").asText();
+            String rule=create("reward-rules",ruleInput(course)).path("id").asText();
+            String rejected=submit(rec);
+            assertThat(submit(rec)).isEqualTo(rejected);
+            review(rejected,"reject",200);
+            review(rejected,"approve",409);
+            http(issue(),user,Map.of("ruleId",rule,"submissionId",rejected),409);
+            var replacement=recording(uid,user);
+            var submission=submit(new Recording(uid,user,rec.session(),replacement.asset()));
+            var body=Map.of("ruleId",rule,"submissionId",submission);
+            review(submission,"approve",200);
+            review(submission,"approve",200);
+            assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM recording_reward_claim",Integer.class)).isZero();
+            var pool=java.util.concurrent.Executors.newFixedThreadPool(2);
+            try {
+                var tasks=new ArrayList<java.util.concurrent.Callable<String>>();
+                for(int i=0;i<2;i++) tasks.add(()->http(issue(),user,body,200).path("id").asText());
+                var ids=pool.invokeAll(tasks);
+                assertThat(ids.get(0).get()).isEqualTo(ids.get(1).get());
+            } finally {pool.shutdownNow();}
+            assertThat(jdbc.queryForObject("SELECT issued FROM recording_reward_rule WHERE id=?",Integer.class,rule)).isOne();
+            assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM entitlement_grant WHERE course_id=? AND source='reward'",Integer.class,course)).isOne();
+            var secondRule=create("reward-rules",ruleInput(course)).path("id").asText();
+            http(issue(),user,Map.of("ruleId",secondRule,"submissionId",submission),409);
+            jdbc.update("UPDATE recording_reward_rule SET status='archived' WHERE id=?",rule);
+            http(issue(),user,body,200);
+        } finally {recordingPermissions(false);}
+    }
+    @Test void twoApprovedLearnersCompetingForLastCourseNeverOversell() throws Exception {
+        recordingPermissions(true);
+        try {
+            String other=id();
+            jdbc.update("INSERT INTO app_user(id,nickname,created_at,updated_at,last_login_at) VALUES (?,'练习',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)",other);
+            var first=recording(uid,user);
+            var second=recording(other,sessions.create(other).accessToken());
+            String course=create("courses",course("purchase")).path("id").asText();
+            String rule=create("reward-rules",ruleInput(course)).path("id").asText();
+            var gate=new java.util.concurrent.CyclicBarrier(2);
+            var tasks=new ArrayList<java.util.concurrent.Callable<Integer>>();
+            for(var rec:List.of(first,second)) {
+                String sub=submit(rec);
+                http(get("/api/v1/practice/submissions/"+sub),rec==first?second.token():user,null,404);
+                review(sub,"approve",200);
+                tasks.add(()->{
+                    gate.await(10,java.util.concurrent.TimeUnit.SECONDS);
+                    return mvc.perform(issue().header("Authorization","Bearer "+rec.token()).contentType(MediaType.APPLICATION_JSON)
+                        .content(json.writeValueAsBytes(Map.of("ruleId",rule,"submissionId",sub)))).andReturn().getResponse().getStatus();
+                });
+            }
+            try(var pool=java.util.concurrent.Executors.newFixedThreadPool(2)) {
+                var results=pool.invokeAll(tasks);
+                assertThat(List.of(results.get(0).get(),results.get(1).get())).containsExactlyInAnyOrder(200,409);
+            }
+            assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM recording_reward_claim WHERE rule_id=?",Integer.class,rule)).isOne();
+        } finally {recordingPermissions(false);}
     }
 }

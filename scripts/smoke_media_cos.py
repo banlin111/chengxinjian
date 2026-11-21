@@ -28,13 +28,14 @@ def main():
     provider.add_argument('--run-real-cloud-upload', action='store_true')
     provider.add_argument('--loopback-audio', action='store_true', help='Use temporary in-memory local objects and real WeChat login')
     provider.add_argument('--loopback-mix', action='store_true', help='Verify saved mixes with local objects and real WeChat login')
+    provider.add_argument('--loopback-rewards', action='store_true', help='Demonstrate recording review and course rewards on loopback')
     modes = parser.add_mutually_exclusive_group()
     modes.add_argument('--audio-probe', action='store_true', help='Exercise only reviewed guided and noise audio with the real IDE')
     modes.add_argument('--course-probe', action='store_true', help='Exercise editorial media, a paid lesson and wx.login in the local IDE')
     parser.add_argument('--mobile-project', type=Path,
                         help='Also verify the compiled frontend in Chromium (requires --course-probe)')
     args = parser.parse_args()
-    if args.loopback_mix:
+    if args.loopback_mix or args.loopback_rewards:
         args.loopback_audio = True
     if args.loopback_audio:
         if args.course_probe or args.mobile_project:
@@ -52,7 +53,7 @@ def main():
     test = load_private(ROOT.parent / '.tools/mysql-test.env', TEST_KEYS)
     if not test.get('TEST_DB_URL', '').startswith('jdbc:mysql://127.0.0.1:33306/cxj_test?'):
         raise ValueError('Only isolated cxj_test is authorized')
-    evidence = ROOT / 'server/target' / ('mix-preset-loopback' if args.loopback_mix else 'practice-audio-loopback' if args.loopback_audio else 'practice-audio-smoke' if args.audio_probe else 'course-cos-smoke' if args.course_probe else 'media-cos-smoke')
+    evidence = ROOT / 'server/target' / ('recording-rewards-loopback' if args.loopback_rewards else 'mix-preset-loopback' if args.loopback_mix else 'practice-audio-loopback' if args.loopback_audio else 'practice-audio-smoke' if args.audio_probe else 'course-cos-smoke' if args.course_probe else 'media-cos-smoke')
     evidence.mkdir(parents=True, exist_ok=True)
     mysql = next((ROOT.parent / '.tools').glob('mysql-*/bin/mysql'))
 
@@ -81,6 +82,8 @@ def main():
     env.update(DB_URL=test['TEST_DB_URL'], DB_USERNAME=test['TEST_DB_USERNAME'], DB_PASSWORD=test['TEST_DB_PASSWORD'],
                SPRING_PROFILES_ACTIVE='local,mysql', SERVER_PORT='18082', LOCAL_ADMIN_USERNAME=username,
                LOCAL_ADMIN_PASSWORD=password, LOCAL_CAPTCHA_TICKET=captcha)
+    if args.loopback_rewards:
+        env['RECORDING_REWARDS_ENABLED'] = 'true'
     if args.mobile_project:
         env['ADMIN_ALLOWED_ORIGINS'] = 'http://127.0.0.1:17173'
     java = next((ROOT.parent / '.tools').glob('jdk-*/Contents/Home/bin/java'))
@@ -228,6 +231,13 @@ def main():
                 "INSERT INTO admin_role_permission VALUES ('"+review_role+"','users:write');"
                 "INSERT INTO admin_account_role SELECT id,'"+review_role+"' FROM admin_account WHERE username='"+username+"';")
 
+        if args.loopback_rewards:
+            sql("INSERT INTO admin_role_permission VALUES ('"+review_role+"','rewards:manage');")
+            from smoke_recording_rewards import exercise
+            exercise(api,upload,check,png(),cloud['FFMPEG_PATH'],report,audio_cleanup,created,evidence)
+            api('POST','/admin/auth/logout',{'refreshToken':login['refreshToken']})
+            report['passed'] = True
+            return
         if args.audio_probe:
             from smoke_practice_audio import exercise
             exercise(api, upload, check, png(), cloud['FFMPEG_PATH'], report, audio_cleanup, grants, mix=args.loopback_mix)
@@ -437,8 +447,10 @@ def main():
                     if resource in course_fixture:
                         sql("UPDATE "+table+" SET status='archived' WHERE id='"+course_fixture[resource]+"';")
                 for table, item in reversed(audio_cleanup):
-                    if table not in ('practice_audio','content_category','membership_plan','mix_preset'):
+                    if table not in ('practice_audio','content_category','membership_plan','mix_preset','recording_reward_rule','content_course','content_lesson','content_teacher'):
                         raise RuntimeError('Unknown fixture table')
+                    if table=='recording_reward_rule':
+                        sql("UPDATE entitlement_grant SET revoked_at=COALESCE(revoked_at,CURRENT_TIMESTAMP) WHERE source='reward' AND source_id IN (SELECT id FROM recording_reward_claim WHERE rule_id='"+str(uuid.UUID(item))+"');")
                     sql("UPDATE "+table+" SET status='archived' WHERE id='"+str(uuid.UUID(item))+"';")
                 for asset_id in created:
                     sql("DELETE FROM editorial_image WHERE asset_id='"+asset_id+"';")
@@ -456,6 +468,6 @@ if __name__ == '__main__':
     except Exception as error:
         # Only our fixed check labels/status codes can reach output; never print provider exceptions.
         message = str(error) if type(error) is RuntimeError else type(error).__name__
-        label = 'Loopback media' if any(arg in sys.argv for arg in ('--loopback-mix','--loopback-audio')) else 'Real COS'
+        label = 'Loopback media' if any(arg in sys.argv for arg in ('--loopback-mix','--loopback-audio','--loopback-rewards')) else 'Real COS'
         print(label+' smoke failed: '+message,file=sys.stderr)
         sys.exit(1)
