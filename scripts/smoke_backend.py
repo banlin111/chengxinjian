@@ -57,6 +57,19 @@ def main():
                 'username': env['LOCAL_ADMIN_USERNAME'], 'password': env['LOCAL_ADMIN_PASSWORD'],
                 'captchaTicket': env['LOCAL_CAPTCHA_TICKET']})['data']
             headers = {'Authorization': 'Bearer ' + auth['accessToken'], 'Idempotency-Key': str(uuid.uuid4())}
+            # A content editor session must never act as a learner claiming a course.
+            for path, method, acting, expected in (
+                    ('/practice/submissions', 'POST', None, 401),
+                    ('/admin/submissions', 'GET', None, 401),
+                    ('/reward-claims', 'POST', headers, 403)):
+                try:
+                    request('/api/v1' + path, method, headers=acting)
+                except urllib.error.HTTPError as exc:
+                    with exc:
+                        if exc.code != expected:
+                            raise AssertionError('Unexpected access check for ' + path) from None
+                else:
+                    raise AssertionError('Role boundary missing for ' + path)
             body = {'name': 'HTTP验证分类', 'kind': 'course', 'sort': 1, 'status': 'draft'}
             first = request('/api/v1/admin/content/categories', 'POST', body, headers)['data']
             repeat = request('/api/v1/admin/content/categories', 'POST', body, headers)['data']
